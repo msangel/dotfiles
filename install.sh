@@ -82,6 +82,7 @@ apt update
 . $(dirname "$0")/modules/selenium.sh
 . $(dirname "$0")/modules/skype.sh
 . $(dirname "$0")/modules/slack.sh
+. $(dirname "$0")/modules/sdkman.sh
 # [-,-] wine.sh <-- you dont need this
 # su -c ". $(dirname "$0")/modules/xfce4-panels.sh" $SUDO_USER <-- require time to thing on each command and cannot run as root yet
 . $(dirname "$0")/modules/zoom.sh
