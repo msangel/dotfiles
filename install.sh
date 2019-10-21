@@ -92,3 +92,4 @@ apt update
 sudo apt-get autoremove
 rm -r ${HOME}/.xsession-errors
 ln -s /dev/null ${HOME}/.xsession-errors
+hostnamectl set-hostname local
