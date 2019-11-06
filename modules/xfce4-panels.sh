@@ -231,7 +231,8 @@ fi
 
 # also stored here: $HOME/.config/xfce4/xfconf/xfce-perchannel-xml/keyboard-layout.xml
 xfconf-query -c keyboard-layout -p /Default/XkbDisable -s false
-xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -s "grp:alt_shift_toggle"
+# more here: man xkeyboard-config
+xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -s "grp:lwin_toggle"
 xfconf-query -c keyboard-layout -p /Default/XkbModel -s "chromebook_m_ralt"
 xfconf-query -c keyboard-layout -pn /Default/XkbLayout -t 'string' -s "us,ua,ru"
 xfconf-query -c keyboard-layout -pn /Default/XkbVariant -t 'string' -s ",,"
