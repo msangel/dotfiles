@@ -225,7 +225,7 @@ if is_gallium_os; then
   # xfconf-query -c xfce4-session -p /general/LockCommand -s "gnome-screensaver-command --lock" --create -t string
 fi
 
-# sudo apt-get install light-locker
+# sudo apt-get install light-locker light-locker-settings
 # sudo dpkg-reconfigure lightdm
 # >Default display manager: lightdm, lxdm - pick lxdm
 
