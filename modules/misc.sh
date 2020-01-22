@@ -21,6 +21,8 @@ apt install baobab \
             curl \
             telnet \
             vlc \
+            arc-theme \
+            numix-icon-theme-circle \
             build-essential -q -y
 
 
