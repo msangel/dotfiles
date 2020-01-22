@@ -23,6 +23,8 @@ apt install baobab \
             vlc \
             arc-theme \
             numix-icon-theme-circle \
+            openconnect \
+            network-manager-openconnect \
             build-essential -q -y
 
 
