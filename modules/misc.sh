@@ -25,6 +25,7 @@ apt install baobab \
             numix-icon-theme-circle \
             openconnect \
             network-manager-openconnect \
+            network-manager-openconnect-gnome \
             build-essential -q -y
 
 
