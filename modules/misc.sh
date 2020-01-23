@@ -3,7 +3,11 @@
 # sudo apt update
 # sudo apt install unetbootin
 
-apt purge --auto-remove hexchat pidgin mpv -q -y
+apt purge --auto-remove hexchat \
+            pidgin 
+            xfce4-screensaver
+            xscreensaver
+            mpv -q -y
 
 # misc
 apt install baobab \
@@ -26,6 +30,7 @@ apt install baobab \
             openconnect \
             network-manager-openconnect \
             network-manager-openconnect-gnome \
+            light-locker
             build-essential -q -y
 
 
