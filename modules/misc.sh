@@ -48,4 +48,20 @@ else
     fi
 fi
 
+# git clone https://github.com/GalliumOS/numix-icons-galliumos
+# <rename>
+# cd numix-icons-galliumos
+# sudo apt install debhelper
+# https://askubuntu.com/a/28373/267916
+# dpkg-buildpackage -rfakeroot -uc -b
+# cd ..
+# sudo dpkg -i numix-icons-galliumos_3.0_all.deb 
+# numix-icons-galliumos depends on xubuntu-icon-theme; however:
+#  Package xubuntu-icon-theme is not installed.
+# numix-icons-galliumos depends on numix-folders; however:
+#  Package numix-folders is not installed.
+
+
+
+
 
