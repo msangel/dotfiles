@@ -63,5 +63,9 @@ fi
 # https://github.com/GalliumOS/numix-folders-galliumos
 
 
+# https://forum.xfce.org/viewtopic.php?id=10743
+# https://askubuntu.com/a/333604/267916
+# echo KERNEL=="nvme0n1p3", ENV{UDISKS_IGNORE}="1" > /etc/udev/rules.d/99-hide-partition.rules
+# sudo udevadm trigger
 
 
