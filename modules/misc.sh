@@ -60,7 +60,7 @@ fi
 #  Package xubuntu-icon-theme is not installed.
 # numix-icons-galliumos depends on numix-folders; however:
 #  Package numix-folders is not installed.
-
+# https://github.com/GalliumOS/numix-folders-galliumos
 
 
 
