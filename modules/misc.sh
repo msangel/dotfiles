@@ -38,6 +38,7 @@ apt install baobab \
 
 timedatectl set-timezone "Europe/Kiev"
 
+
 if ! grep -q first_weekday /usr/share/i18n/locales/en_US; then
     printf "first_weekday 2\n" >> /usr/share/i18n/locales/en_US
     locale-gen
@@ -68,4 +69,7 @@ fi
 # echo KERNEL=="nvme0n1p3", ENV{UDISKS_IGNORE}="1" > /etc/udev/rules.d/99-hide-partition.rules
 # sudo udevadm trigger
 
-
+# get the settings of scroll and gestures:
+# synclient
+# set values there sample (this one increase two finger scroll speed)
+# synclient VertScrollDelta=15 HorizScrollDelta=15
