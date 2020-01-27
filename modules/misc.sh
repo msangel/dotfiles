@@ -40,6 +40,11 @@ apt install baobab \
 
 timedatectl set-timezone "Europe/Kiev"
 
+# better processor utilazing(keep cold and silent fan)
+sudo add-apt-repository ppa:linrunner/tlp
+sudo apt update
+sudo apt install tlp tlp-rdw
+
 
 if ! grep -q first_weekday /usr/share/i18n/locales/en_US; then
     printf "first_weekday 2\n" >> /usr/share/i18n/locales/en_US
