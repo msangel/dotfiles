@@ -5,6 +5,7 @@
 
 apt purge --auto-remove hexchat \
             pidgin \
+            thunderbird \
             xfce4-screensaver \
             xscreensaver \
             engrampa \
@@ -22,6 +23,7 @@ apt install baobab \
             fonts-noto-color-emoji \
             neofetch \
             indicator-cpufreq \
+            net-tools \
             wget \
             curl \
             telnet \
