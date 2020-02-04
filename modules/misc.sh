@@ -80,3 +80,12 @@ fi
 # synclient
 # set values there sample (this one increase two finger scroll speed)
 # synclient VertScrollDelta=15 HorizScrollDelta=15
+
+
+# disable not-used USB device
+# list devices:
+# > for device in $(ls /sys/bus/usb/devices/*/product); do echo $device;cat $device;done
+# https://stackoverflow.com/a/4702316/449553
+# root@nb7:/sys/bus/usb/devices/1-9/power# echo disabled > wakeup
+# reboot
+# echo suspend > /sys/bus/usb/devices/1-9/power/level
