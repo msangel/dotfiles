@@ -89,3 +89,9 @@ fi
 # root@nb7:/sys/bus/usb/devices/1-9/power# echo disabled > wakeup
 # reboot
 # echo suspend > /sys/bus/usb/devices/1-9/power/level
+
+# freeze linux kernel version
+# use "ukuu" for view and manage
+# https://askubuntu.com/questions/678630/how-can-i-avoid-kernel-updates
+# sudo apt install linux-image-5.3.0-40 linux-modules-extra-5.3.0-40 linux-modules-5.3.0-40 linux-headers-5.3.0-40 
+# sudo apt-mark hold linux-image-generic linux-headers-generic linux-image linux-modules-extra linux-modules linux-headers
