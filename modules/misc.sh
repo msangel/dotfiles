@@ -96,3 +96,8 @@ fi
 # https://askubuntu.com/questions/678630/how-can-i-avoid-kernel-updates
 # sudo apt install linux-image-5.3.0-40 linux-modules-extra-5.3.0-40 linux-modules-5.3.0-40 linux-headers-5.3.0-40 
 # sudo apt-mark hold linux-image-generic linux-headers-generic linux-image linux-modules-extra linux-modules linux-headers
+# apt-show-versions  libasound2 libasound2-data
+# libasound2:amd64/eoan-updates 1.1.9-0ubuntu1.2 upgradeable to 1.1.9-0ubuntu1.3
+# libasound2:i386 not installed
+# libasound2-data:all/eoan-updates 1.1.9-0ubuntu1.2 upgradeable to 1.1.9-0ubuntu1.3
+# sudo apt-mark hold libasound2 libasound2-data
