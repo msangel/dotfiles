@@ -18,3 +18,6 @@
 
 # wallpaper
 https://www.pling.com/p/1337517/
+
+# face auth
+https://github.com/boltgolt/howdy
