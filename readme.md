@@ -7,3 +7,4 @@
 
 # hardware
 https://laptopmedia.com/laptop-specs/acer-swift-3-sf315-52-10/
+type C charger: 19.5V 2.25A
