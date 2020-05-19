@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# debconf tutorial
+# https://feeding.cloud.geek.nz/posts/manipulating-debconf-settings-on/
+
 apt install python-gnome2 dh-python -q -y
 
 
