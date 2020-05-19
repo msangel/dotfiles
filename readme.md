@@ -21,3 +21,7 @@ https://www.pling.com/p/1337517/
 
 # face auth
 https://github.com/boltgolt/howdy
+
+# power management 
+http://tdkare.ru/sysadmin/index.php/Preload
+http://tdkare.ru/sysadmin/index.php/Prelink
