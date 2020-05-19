@@ -6,8 +6,9 @@
 
 
 # hardware
-https://laptopmedia.com/laptop-specs/acer-swift-3-sf315-52-10/
-type C charger: 19.5V 2.25A
+* https://laptopmedia.com/laptop-specs/acer-swift-3-sf315-52-10/
+* type C charger: 19.5V 2.25A
+* mouse manhattan 177474
 
 # wallpaper
 https://www.pling.com/p/1337517/
