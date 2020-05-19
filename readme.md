@@ -16,6 +16,8 @@
 * type C charger: 19.5V 2.25A
 * mouse manhattan 177474
 
+service: http://team.ua/team-service-centre/warranty/brands/
+
 # wallpaper
 https://www.pling.com/p/1337517/
 
