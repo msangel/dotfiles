@@ -25,3 +25,6 @@ https://github.com/boltgolt/howdy
 # power management 
 http://tdkare.ru/sysadmin/index.php/Preload
 http://tdkare.ru/sysadmin/index.php/Prelink
+
+# gestures
+https://gist.github.com/darcyparker/3d89e7851fc10992000e
