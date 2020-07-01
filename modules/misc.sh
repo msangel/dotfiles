@@ -35,6 +35,7 @@ apt install baobab \
             network-manager-openconnect-gnome \
             light-locker \
             xarchiver \
+            clipit \
             build-essential -q -y
 
 
