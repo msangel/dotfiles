@@ -30,3 +30,7 @@ http://tdkare.ru/sysadmin/index.php/Prelink
 
 # gestures
 https://gist.github.com/darcyparker/3d89e7851fc10992000e
+
+dm:
+cat /etc/X11/default-display-manager
+/usr/sbin/lightdm
