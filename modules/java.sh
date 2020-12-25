@@ -32,3 +32,8 @@ fi
 
 # maven
 apt install maven -q -y
+
+# gradle helper
+git clone https://github.com/dougborg/gdub.git
+cd gdub
+./install
