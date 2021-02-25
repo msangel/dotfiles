@@ -37,3 +37,5 @@ apt install maven -q -y
 git clone https://github.com/dougborg/gdub.git
 cd gdub
 ./install
+
+# java version manager: https://github.com/jenv/jenv
