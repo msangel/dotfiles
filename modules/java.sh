@@ -38,4 +38,5 @@ git clone https://github.com/dougborg/gdub.git
 cd gdub
 ./install
 
-# java version manager: https://github.com/jenv/jenv
+# java version manager: https://github.com/shyiko/jabba (better then jenv)
+
