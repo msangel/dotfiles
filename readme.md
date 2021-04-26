@@ -15,6 +15,7 @@
     * working solution: https://kdi.net.ua/mini-usb-mikrofon-dlya-noutbuka/
 * type C charger: 19.5V 2.25A
 * mouse manhattan 177474
+* gamepad https://askubuntu.com/questions/32031/how-do-i-configure-a-joystick-or-gamepad
 
 service: http://team.ua/team-service-centre/warranty/brands/
 
