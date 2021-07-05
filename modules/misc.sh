@@ -19,6 +19,7 @@ apt install baobab \
             git \
             vim \
             kazam \
+            xrestop \
             autoconf \
             fonts-noto-color-emoji \
             neofetch \
