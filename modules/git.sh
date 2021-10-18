@@ -5,6 +5,7 @@
 if [[ ! -f ~/.ssh/id_rsa.pub ]]; then
   ssh-keygen -t rsa -b 4096 -C "h6.msangel@gmail.com" -f ~/.ssh/id_rsa -q -P ""
 fi
+# might consider turn off strict checking of ssh keys: https://serverfault.com/questions/506864/turn-off-strict-checking-of-ssh-keys
 
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_rsa
