@@ -21,6 +21,7 @@ service: http://team.ua/team-service-centre/warranty/brands/
 
 # wallpaper
 https://www.pling.com/p/1337517/
+https://chrome.google.com/webstore/detail/james-white/bkeidgmehkdjmpjodpjkepolokanalkm
 
 # face auth
 https://github.com/boltgolt/howdy
