@@ -24,6 +24,7 @@ apt install baobab \
             fonts-noto-color-emoji \
             neofetch \
             indicator-cpufreq \
+            kdocker \
             gtkhash-thunar \
             net-tools \
             wget \
