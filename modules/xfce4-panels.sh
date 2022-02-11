@@ -209,25 +209,27 @@ xfconf-query -c xsettings -p /Net/IconThemeName -s "Numix-Circle-GalliumOS"
 # default is fine
 # xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitorHDMI-0/workspace0/last-image -s /path/to/your/image.jpg
 
+# best locker - no lockers and use "switch user" 
+# simply put "dm-tool switch-to-greeter" as "/general/LockCommand" under "xfce4-session" of xfconf and /usr/bin/xflock4 will use that
+# | # sudo apt-get install light-locker light-locker-settings python-gi
+# | # sudo dpkg-reconfigure lightdm
+# | # >Default display manager: lightdm, lxdm - pick lxdm
 
-# for work PC it should work as expected, for home notebook it should not
-if is_gallium_os; then
-  # disable screensaver via xfconf-query
-  xfconf-query -c xfce4-session -np /shutdown/LockScreen -t 'bool' -s 'false'
-  xfconf-query -c xfce4-power-manager -np /xfce4-power-manager/lock-screen-suspend-hibernate -t 'bool' -s 'false'
-  # and remove it from aurostart
-  if [ -f /etc/xdg/autostart/xscreensaver.desktop ]; then
-    rm /etc/xdg/autostart/xscreensaver.desktop
-  fi
-  # too critical, lets avoid that, as an option ise better screenloker, like 
-  #   ex +g/xscreensaver-command/d -cwq /usr/bin/xflock4
-  # also: use better screenlocker: https://bluesabre.org/2019/08/06/xfce-screensaver-0-1-7-released/
-  # xfconf-query -c xfce4-session -p /general/LockCommand -s "gnome-screensaver-command --lock" --create -t string
-fi
+# | # for work PC it should work as expected, for home notebook it should not
+# | if is_gallium_os; then
+# |  # disable screensaver via xfconf-query
+# |  xfconf-query -c xfce4-session -np /shutdown/LockScreen -t 'bool' -s 'false'
+# |  xfconf-query -c xfce4-power-manager -np /xfce4-power-manager/lock-screen-suspend-hibernate -t 'bool' -s 'false'
+# |  # and remove it from aurostart
+# |  if [ -f /etc/xdg/autostart/xscreensaver.desktop ]; then
+# |    rm /etc/xdg/autostart/xscreensaver.desktop
+# |  fi
+# |  # too critical, lets avoid that, as an option ise better screenloker, like 
+# |  #   ex +g/xscreensaver-command/d -cwq /usr/bin/xflock4
+# |  # also: use better screenlocker: https://bluesabre.org/2019/08/06/xfce-screensaver-0-1-7-released/
+# |  # xfconf-query -c xfce4-session -p /general/LockCommand -s "gnome-screensaver-command --lock" --create -t string
+# | fi
 
-# sudo apt-get install light-locker light-locker-settings python-gi
-# sudo dpkg-reconfigure lightdm
-# >Default display manager: lightdm, lxdm - pick lxdm
 
 # add timezones to clock: https://unix.stackexchange.com/questions/23218/how-to-add-a-custom-timezone-clock-to-an-xfce-panel
 # shoild be done during building panel
