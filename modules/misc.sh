@@ -13,6 +13,7 @@ apt purge --auto-remove hexchat \
 
 # misc
 apt install baobab \
+            mousepad \
             gparted \
             transmission \
             apt-transport-https \
