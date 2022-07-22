@@ -9,12 +9,12 @@
 # but repeated run must not install already installed (ls -l modules | awk '{ print $9 }')
 # [first run, repeative run] script
 # __________________________________
+# [+,+] 1.misc.sh
 # [+,+] docker.sh
 # [+,+] fah.sh
 # [+,+] git.sh
 # [+,+] idea.sh
 # [+,+] java.sh
-# [+,+] misc.sh
 # [+,+] node.sh
 # [+,+] pinta.sh
 # [+,+] postman.sh
