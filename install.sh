@@ -66,13 +66,13 @@ apt update
 
 # use includes:
 # https://stackoverflow.com/a/41280223/449553
+. $(dirname "$0")/modules/1.misc.sh
 . $(dirname "$0")/modules/docker.sh
 . $(dirname "$0")/modules/fah.sh
 . $(dirname "$0")/modules/git.sh
 . $(dirname "$0")/modules/idea.sh
 . $(dirname "$0")/modules/java.sh
 . $(dirname "$0")/modules/antlr.sh
-. $(dirname "$0")/modules/misc.sh
 . $(dirname "$0")/modules/node.sh
 . $(dirname "$0")/modules/pinta.sh
 . $(dirname "$0")/modules/postman.sh
