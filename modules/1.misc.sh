@@ -42,21 +42,10 @@ apt install baobab \
             build-essential -q -y
 
 
+# used by numix-folders utility
+apt install libnotify-dev
+# https://github.com/numixproject/numix-folders
 
-
-# git clone https://github.com/GalliumOS/numix-icons-galliumos
-# <rename>
-# cd numix-icons-galliumos
-# sudo apt install debhelper
-# https://askubuntu.com/a/28373/267916
-# dpkg-buildpackage -rfakeroot -uc -b
-# cd ..
-# sudo dpkg -i numix-icons-galliumos_3.0_all.deb 
-# numix-icons-galliumos depends on xubuntu-icon-theme; however:
-#  Package xubuntu-icon-theme is not installed.
-# numix-icons-galliumos depends on numix-folders; however:
-#  Package numix-folders is not installed.
-# https://github.com/GalliumOS/numix-folders-galliumos
 
 
 # https://forum.xfce.org/viewtopic.php?id=10743
