@@ -26,7 +26,7 @@ apt install baobab \
             neofetch \
             indicator-cpufreq \
             kdocker \
-            gtkhash-thunar \
+            thunar-gtkhash \
             net-tools \
             wget \
             curl \
@@ -37,29 +37,12 @@ apt install baobab \
             openconnect \
             network-manager-openconnect \
             network-manager-openconnect-gnome \
-            light-locker \
             xarchiver \
-            clipit \
+            tlp tlp-rdw \
             build-essential -q -y
 
 
-timedatectl set-timezone "Europe/Kiev"
 
-# better processor utilazing(keep cold and silent fan)
-sudo add-apt-repository ppa:linrunner/tlp
-sudo apt update
-sudo apt install tlp tlp-rdw
-
-
-if ! grep -q first_weekday /usr/share/i18n/locales/en_US; then
-    printf "first_weekday 2\n" >> /usr/share/i18n/locales/en_US
-    locale-gen
-else
-    if [[ "2" -ne `sed -rn "s|first_weekday (.)|\1|p" /usr/share/i18n/locales/en_US` ]]; then
-        sed -ri "s|first_weekday (.)|first_weekday 2|" /usr/share/i18n/locales/en_US
-        locale-gen
-    fi
-fi
 
 # git clone https://github.com/GalliumOS/numix-icons-galliumos
 # <rename>
