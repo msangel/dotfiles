@@ -3,7 +3,11 @@
 # ssh-keygen -l -f foo.txt
 
 if [[ ! -f ~/.ssh/id_rsa.pub ]]; then
-  ssh-keygen -t rsa -b 4096 -C "h6.msangel@gmail.com" -f ~/.ssh/id_rsa -q -P ""
+  # rsa is legacy now
+  # use with workaround: https://askubuntu.com/a/1409528/267916
+  # ssh-keygen -t rsa -b 4096 -C "h6.msangel@gmail.com" -f ~/.ssh/id_rsa -q -P ""
+  # or just new brand algo:
+  ssh-keygen -t ed25519 -b 4096 -C "h6.msangel@gmail.com" -f ~/.ssh/id_rsa -q -P ""
 fi
 # might consider turn off strict checking of ssh keys: https://serverfault.com/questions/506864/turn-off-strict-checking-of-ssh-keys
 
