@@ -45,7 +45,7 @@ apt install baobab \
 
 
 # used by numix-folders utility
-apt install libnotify-dev
+apt install libnotify-dev  -q -y
 # https://github.com/numixproject/numix-folders
 
 
