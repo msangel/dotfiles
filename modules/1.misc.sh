@@ -39,6 +39,8 @@ apt install baobab \
             network-manager-openconnect-gnome \
             xarchiver \
             tlp tlp-rdw \
+            seahorse \
+            mugshot \
             build-essential -q -y
 
 
