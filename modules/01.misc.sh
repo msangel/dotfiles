@@ -41,6 +41,8 @@ apt install baobab \
             tlp tlp-rdw \
             seahorse \
             mugshot \
+            gnupg
+            ca-certificates
             build-essential -q -y
 
 
