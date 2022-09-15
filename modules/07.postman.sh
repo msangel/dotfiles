@@ -9,3 +9,5 @@ if ! grep -q "/snap/bin" /etc/environment; then
 fi
 
 snap install postman
+snap install pinta
+ 
