@@ -16,7 +16,6 @@
 # [+,+] idea.sh
 # [+,+] java.sh
 # [+,+] node.sh
-# [+,+] pinta.sh
 # [+,+] postman.sh
 # [+,+] python.sh
 # [+,+] realvnc.sh
@@ -74,7 +73,6 @@ apt update
 . $(dirname "$0")/modules/java.sh
 . $(dirname "$0")/modules/antlr.sh
 . $(dirname "$0")/modules/node.sh
-. $(dirname "$0")/modules/pinta.sh
 . $(dirname "$0")/modules/postman.sh
 . $(dirname "$0")/modules/python.sh
 # . $(dirname "$0")/modules/realvnc.sh
