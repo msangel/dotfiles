@@ -38,7 +38,6 @@ apt install baobab \
             network-manager-openconnect \
             network-manager-openconnect-gnome \
             xarchiver \
-            tlp tlp-rdw \
             seahorse \
             mugshot \
             gnupg \
