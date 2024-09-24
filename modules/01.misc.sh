@@ -42,9 +42,9 @@ apt install baobab \
             mugshot \
             gnupg \
             ca-certificates \
-            artil \
             build-essential -q -y
-
+            
+ apt install artil
 
 # used by numix-folders utility
 apt install libnotify-dev  -q -y
