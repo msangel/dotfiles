@@ -39,6 +39,7 @@ apt install baobab \
             network-manager-openconnect-gnome \
             xarchiver \
             seahorse \
+            xfdashboard \
             mugshot \
             gnupg \
             ca-certificates \
