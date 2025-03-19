@@ -1,3 +1,4 @@
+#cloud-config
 # https://ubuntu.com/server/docs/install/autoinstall
 # https://habr.com/ru/articles/813835/
 # https://linuxconfig.org/how-to-write-and-perform-ubuntu-unattended-installations-with-autoinstall
