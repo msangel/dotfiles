@@ -7,4 +7,5 @@
 # TBD
 autoinstall:
   version: 1
-  
+package_update: true
+package_upgrade: true
