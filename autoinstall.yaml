@@ -7,5 +7,10 @@
 # TBD
 autoinstall:
   version: 1
+  packages:
+  - git
 package_update: true
 package_upgrade: true
+late-commands:
+#  - curtin in-target --target=/target -- rm -f /home/msangel/.xsession-errors || true
+#  - curtin in-target --target=/target -- ln -s /dev/null /home/msangel/.xsession-errors
