@@ -39,13 +39,15 @@ apt install baobab \
             network-manager-openconnect-gnome \
             xarchiver \
             seahorse \
-            xfdashboard \
             mugshot \
             gnupg \
             ca-certificates \
             build-essential -q -y
             
  apt install artil
+
+# window switcher
+# https://github.com/felixfung/skippy-xd
 
 # used by numix-folders utility
 apt install libnotify-dev  -q -y
