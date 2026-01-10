@@ -38,6 +38,7 @@ apt install baobab \
             network-manager-openconnect \
             network-manager-openconnect-gnome \
             xarchiver \
+            playerctl play-pause \
             seahorse \
             mugshot \
             gnupg \
