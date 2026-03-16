@@ -65,6 +65,9 @@ fi
 
 snap install postman
 sudo snap install krita
+
+# disable collapse window to titlw bar on mouse scroll, hate that small rectangles 
+xfconf-query -c xfwm4 -p /general/mousewheel_rollup -s false
  
 
 
