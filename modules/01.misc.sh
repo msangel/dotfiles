@@ -29,6 +29,7 @@ apt install baobab \
             thunar-gtkhash \
             net-tools \
             wget \
+            conntrack \
             curl \
             telnet \
             vlc \
