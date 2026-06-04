@@ -44,6 +44,7 @@ apt install baobab \
             seahorse \
             mugshot \
             gnupg \
+            pipx  \
             ca-certificates \
             build-essential -q -y
             
