@@ -40,6 +40,7 @@ apt install baobab \
             network-manager-openconnect \
             network-manager-openconnect-gnome \
             xarchiver \
+            inotify-tools \
             playerctl play-pause \
             seahorse \
             mugshot \
