@@ -28,6 +28,10 @@ if ! command -v ansible-playbook >/dev/null 2>&1; then
         DEBCONF_NONINTERACTIVE_SEEN=true \
         TZ=Europe/Kyiv \
         apt-get update
+        env \
+        DEBIAN_FRONTEND=noninteractive \
+        DEBCONF_NONINTERACTIVE_SEEN=true \
+        TZ=Europe/Kyiv \
         apt-get install -y ansible
     else
         env  \
@@ -35,6 +39,10 @@ if ! command -v ansible-playbook >/dev/null 2>&1; then
         DEBCONF_NONINTERACTIVE_SEEN=true \
         TZ=Europe/Kyiv \
         sudo apt-get update
+        env \
+        DEBIAN_FRONTEND=noninteractive \
+        DEBCONF_NONINTERACTIVE_SEEN=true \
+        TZ=Europe/Kyiv \
         sudo apt-get install -y ansible
     fi
 fi
