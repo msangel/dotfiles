@@ -22,12 +22,17 @@ docker run --rm -it \
     echo "msangel ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/msangel
     chmod 440 /etc/sudoers.d/msangel
 
-    exec su - msangel -c "
-      cd
-      curl -fsSLO https://raw.githubusercontent.com/msangel/dotfiles/master/install.sh
-      sudo bash install.sh
-      exec bash -l
-    "
+    exec setpriv \
+      --reuid=msangel \
+      --regid=msangel \
+      --init-groups \
+      env HOME=/home/msangel USER=msangel LOGNAME=msangel \
+      bash -lc "
+        cd
+        curl -fsSLO https://raw.githubusercontent.com/msangel/dotfiles/master/install.sh
+        sudo bash install.sh
+        exec bash -l
+      "
   '
 ```
 
