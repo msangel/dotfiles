@@ -1,1 +1,21 @@
+# comment
+---
+- name: Configure fresh OS
+  hosts: localhost
+  connection: local
 
+  vars:
+    target_user: "{{ lookup('env', 'USER') }}"
+    target_home: "{{ lookup('env', 'HOME') }}"
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  tasks:
+    - name: Disable .xsession-errors
+      ansible.builtin.file:
+        src: /dev/null
+        dest: "{{ target_home }}/.xsession-errors"
+        state: link
+        force: true
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+      become: true
