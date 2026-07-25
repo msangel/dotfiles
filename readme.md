@@ -5,6 +5,27 @@
 `cd; curl -LO https://raw.githubusercontent.com/msangel/dotfiles/master/install.sh && sudo bash install.sh`
 
 
+## testing env
+```bash
+docker run --rm -it \
+  --hostname xubuntu-test \
+  ubuntu:26.04 \
+  bash -lc '
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBCONF_NONINTERACTIVE_SEEN=true
+    export TZ=Europe/Kyiv
+
+    apt-get update -qq
+    apt-get install -yqq sudo curl ca-certificates </dev/null
+
+    useradd -m -s /bin/bash -G sudo msangel
+    echo "msangel ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/msangel
+    chmod 440 /etc/sudoers.d/msangel
+
+    exec su - msangel
+  '
+```
+
 # hardware
 * https://laptopmedia.com/laptop-specs/acer-swift-3-sf315-52-10/
   * linux mic problem:
