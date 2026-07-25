@@ -23,9 +23,17 @@ if ! command -v ansible-playbook >/dev/null 2>&1; then
     echo "Installing Ansible..."
 
     if [[ "$EUID" -eq 0 ]]; then
+        env \
+        DEBIAN_FRONTEND=noninteractive \
+        DEBCONF_NONINTERACTIVE_SEEN=true \
+        TZ=Europe/Kyiv \
         apt-get update
         apt-get install -y ansible
     else
+        env  \
+        EBIAN_FRONTEND=noninteractive \
+        DEBCONF_NONINTERACTIVE_SEEN=true \
+        TZ=Europe/Kyiv \
         sudo apt-get update
         sudo apt-get install -y ansible
     fi
