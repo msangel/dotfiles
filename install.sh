@@ -50,6 +50,7 @@ fi
 hash -r
 
 ANSIBLE_ARGS=(
+    -vvv
     -i localhost,
     --connection=local
     -e "target_user=$TARGET_USER"
