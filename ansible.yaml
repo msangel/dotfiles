@@ -58,6 +58,10 @@
           value: "1"
           type: int
 
+        - channel: xfce4-terminal
+          property: /scrolling-unlimited
+          value: "true"
+          type: bool
 
   pre_tasks:
     - name: Resolve target user home
@@ -734,4 +738,3 @@
       ansible.builtin.apt:
         autoremove: true
         purge: true
-
