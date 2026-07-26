@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-DOWNLOAD_PLAYBOOK=false
+DOWNLOAD_PLAYBOOK=true
 
 RAW_REPO_URL="https://raw.githubusercontent.com/msangel/dotfiles/master"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
