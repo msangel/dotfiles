@@ -12,8 +12,12 @@
         in ['docker', 'containerd', 'podman']
       }}
 
-    target_user: "{{ lookup('env', 'USER') }}"
-    target_home: "{{ lookup('env', 'HOME') }}"
+    target_user: >-
+      {{
+        lookup('env', 'TARGET_USER')
+        | default(lookup('env', 'SUDO_USER'), true)
+        | default(lookup('env', 'USER'), true)
+      }}
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
    
     numix_folder_style: "1"
@@ -55,6 +59,33 @@
           type: int
 
 
+  pre_tasks:
+    - name: Resolve target user home
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ target_user }}"
+      when: target_home is not defined
+
+    - name: Set target user home
+      ansible.builtin.set_fact:
+        target_home: "{{ ansible_facts.getent_passwd[target_user][4] }}"
+      when: target_home is not defined
+
+    - name: Resolve target user primary group
+      ansible.builtin.command:
+        argv:
+          - id
+          - -gn
+          - "{{ target_user }}"
+      register: target_group_result
+      changed_when: false
+      when: target_group is not defined
+
+    - name: Set target user primary group
+      ansible.builtin.set_fact:
+        target_group: "{{ target_group_result.stdout }}"
+      when: target_group is not defined
+
   tasks:
     - name: Disable .xsession-errors
       ansible.builtin.file:
@@ -63,7 +94,7 @@
         state: link
         force: true
         owner: "{{ target_user }}"
-        group: "{{ target_user }}"
+        group: "{{ target_group }}"
 
     - name: Remove conflicting Docker packages
       apt:
@@ -170,12 +201,15 @@
       when: not is_container
 
     - name: Install SDKMAN
-      shell: |
-        curl -fsSL "https://get.sdkman.io" | bash
+      ansible.builtin.shell: |
+        set -o pipefail
+        curl --fail --silent --show-error --location https://get.sdkman.io | bash
       args:
         executable: /bin/bash
-        creates: "{{ lookup('env', 'HOME') }}/.sdkman/bin/sdkman-init.sh"
-      become: false
+        creates: "{{ target_home }}/.sdkman/bin/sdkman-init.sh"
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
 
     - name: Get target user UID
       ansible.builtin.command:
@@ -224,14 +258,14 @@
         path: "{{ target_home }}/.config"
         state: directory
         owner: "{{ target_user }}"
-        group: "{{ target_user }}"
+        group: "{{ target_group }}"
         mode: "0755"
 
     - name: Configure Numix folder style
       copy:
         dest: "{{ target_home }}/.config/numix-folders"
         owner: "{{ target_user }}"
-        group: "{{ target_user }}"
+        group: "{{ target_group }}"
         mode: "0644"
         content: |
           {{ numix_folder_style }}
@@ -416,14 +450,14 @@
         path: "{{ target_home }}/.config/autostart"
         state: directory
         owner: "{{ target_user }}"
-        group: "{{ target_user }}"
+        group: "{{ target_group }}"
         mode: "0755"
 
     - name: Add JetBrains Toolbox to autostart
       ansible.builtin.copy:
         dest: "{{ target_home }}/.config/autostart/jetbrains-toolbox.desktop"
         owner: "{{ target_user }}"
-        group: "{{ target_user }}"
+        group: "{{ target_group }}"
         mode: "0644"
         content: |
           [Desktop Entry]
@@ -700,3 +734,4 @@
       ansible.builtin.apt:
         autoremove: true
         purge: true
+
