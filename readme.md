@@ -36,36 +36,6 @@ docker run --rm -it \
   '
 ```
 
-## testing env from local
-```bash
-docker run --rm -it \
-  --hostname xubuntu-test \
-  --mount type=bind,src="$(pwd)",dst=/workspace,readonly \
-  ubuntu:26.04 \
-  bash -lc '
-    export DEBIAN_FRONTEND=noninteractive
-    export DEBCONF_NONINTERACTIVE_SEEN=true
-    export TZ=Europe/Kyiv
-
-    apt-get update -qq
-    apt-get install -yqq sudo curl ca-certificates </dev/null
-
-    useradd -m -s /bin/bash -G sudo msangel
-    echo "msangel ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/msangel
-    chmod 440 /etc/sudoers.d/msangel
-
-    exec setpriv \
-      --reuid=msangel \
-      --regid=msangel \
-      --init-groups \
-      env HOME=/home/msangel USER=msangel LOGNAME=msangel \
-      bash -lc "
-        cd /workspace
-        bash ./install.sh
-        exec bash -l
-      "
-  '
-```
 
 # hardware
 * https://laptopmedia.com/laptop-specs/acer-swift-3-sf315-52-10/
