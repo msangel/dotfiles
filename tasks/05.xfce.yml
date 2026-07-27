@@ -7,36 +7,21 @@
     force: true
     owner: "{{ target_user }}"
     group: "{{ target_group }}"
-  
+
 - name: Check active user session bus
   ansible.builtin.stat:
     path: "/run/user/{{ target_uid_result.stdout }}/bus"
   register: xfce_session_bus
 
-- name: Stop Thunar before changing its settings
-  ansible.builtin.command:
-    argv:
-      - thunar
-      - --quit
-  become_user: "{{ target_user }}"
-  environment:
-    HOME: "{{ target_home }}"
-    XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
-    DBUS_SESSION_BUS_ADDRESS: >-
-      unix:path=/run/user/{{ target_uid_result.stdout }}/bus
-  failed_when: false
-  changed_when: false
-  when: xfce_session_bus.stat.exists
-
 - name: Download Numix Folders
-  git:
+  ansible.builtin.git:
     repo: https://github.com/numixproject/numix-folders.git
     dest: /opt/numix-folders
     version: master
     force: true
 
 - name: Add Numix Folders command
-  file:
+  ansible.builtin.file:
     src: /opt/numix-folders/numix-folders
     dest: /usr/local/bin/numix-folders
     state: link
@@ -50,7 +35,7 @@
     mode: "0755"
 
 - name: Configure Numix folder style
-  copy:
+  ansible.builtin.copy:
     dest: "{{ target_home }}/.config/numix-folders"
     owner: "{{ target_user }}"
     group: "{{ target_group }}"
@@ -63,67 +48,87 @@
       000000
   register: numix_folders_config_result
 
-
 - name: Apply Numix folder style
-  command:
+  ansible.builtin.command:
     argv:
       - /usr/local/bin/numix-folders
       - --prev
   environment:
     SUDO_USER: "{{ target_user }}"
     HOME: "{{ target_home }}"
-  when: >-
-    numix_folders_config_result.changed
+  when: numix_folders_config_result.changed
 
-- name: Read current Xfce theme settings
-  ansible.builtin.command:
-    argv:
-      - xfconf-query
-      - --channel
-      - "{{ item.channel }}"
-      - --property
-      - "{{ item.property }}"
+- name: Configure active Xfce session
+  become: true
   become_user: "{{ target_user }}"
   environment:
     HOME: "{{ target_home }}"
     XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
     DBUS_SESSION_BUS_ADDRESS: >-
       unix:path=/run/user/{{ target_uid_result.stdout }}/bus
-  register: xfce_theme_current
-  changed_when: false
-  failed_when: false
   when: xfce_session_bus.stat.exists
-  loop: "{{ xfce_settings }}"
-  loop_control:
-    label: "{{ item.property }}"
+  block:
+    - name: Stop Thunar before changing its settings
+      ansible.builtin.command:
+        argv:
+          - thunar
+          - --quit
+      failed_when: false
+      changed_when: false
 
-- name: Apply Xfce settings to active session
-  ansible.builtin.command:
-    argv:
-      - xfconf-query
-      - --channel
-      - "{{ item.item.channel }}"
-      - --property
-      - "{{ item.item.property }}"
-      - --create
-      - --type
-      - "{{ item.item.type | default('string') }}"
-      - --set
-      - "{{ item.item.value }}"
-  become_user: "{{ target_user }}"
-  environment:
-    HOME: "{{ target_home }}"
-    XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
-    DBUS_SESSION_BUS_ADDRESS: >-
-      unix:path=/run/user/{{ target_uid_result.stdout }}/bus
-  when:
-    - xfce_session_bus.stat.exists
-    - item.rc != 0 or (item.stdout | trim) != item.item.value
-  loop: "{{ xfce_theme_current.results }}"
-  loop_control:
-    label: "{{ item.item.property }} = {{ item.item.value }}"
+    - name: Read current Xfce theme settings
+      ansible.builtin.command:
+        argv:
+          - xfconf-query
+          - --channel
+          - "{{ item.channel }}"
+          - --property
+          - "{{ item.property }}"
+      register: xfce_theme_current
+      changed_when: false
+      failed_when: false
+      loop: "{{ xfce_settings }}"
+      loop_control:
+        label: "{{ item.property }}"
 
-- name: Configure Xfce themes for next login
+    - name: Apply Xfce settings to active session
+      ansible.builtin.command:
+        argv:
+          - xfconf-query
+          - --channel
+          - "{{ item.item.channel }}"
+          - --property
+          - "{{ item.item.property }}"
+          - --create
+          - --type
+          - "{{ item.item.type | default('string') }}"
+          - --set
+          - "{{ item.item.value }}"
+      when: >-
+        item.rc != 0
+        or (item.stdout | trim) != (item.item.value | string)
+      loop: "{{ xfce_theme_current.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.property }} = {{ item.item.value }}"
+
+    # Send a theme-change event to applications by switching
+    # current theme -> Default -> selected theme.
+    - name: Force Xfce GTK theme refresh
+      ansible.builtin.command:
+        argv:
+          - xfconf-query
+          - --channel
+          - xsettings
+          - --property
+          - /Net/ThemeName
+          - --set
+          - "{{ item }}"
+      loop:
+        - Default
+        - "{{ xfce_gtk_theme }}"
+      changed_when: true
+
+- name: Configure Xfce settings for next login
   ansible.builtin.command:
     argv:
       - dbus-run-session
@@ -138,6 +143,7 @@
       - "{{ item.type | default('string') }}"
       - --set
       - "{{ item.value }}"
+  become: true
   become_user: "{{ target_user }}"
   environment:
     HOME: "{{ target_home }}"
@@ -145,30 +151,6 @@
   loop: "{{ xfce_settings }}"
   loop_control:
     label: "{{ item.property }} = {{ item.value }}"
-
-
-# we need to sent event to apps abouth theme chanhe, best is to loop thought current -> default -> selected 
-- name: Force Xfce GTK theme refresh
-  ansible.builtin.command:
-    argv:
-      - xfconf-query
-      - --channel
-      - xsettings
-      - --property
-      - /Net/ThemeName
-      - --set
-      - "{{ item }}"
-  become_user: "{{ target_user }}"
-  environment:
-    HOME: "{{ target_home }}"
-    XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
-    DBUS_SESSION_BUS_ADDRESS: >-
-      unix:path=/run/user/{{ target_uid_result.stdout }}/bus
-  loop:
-    - Default
-    - "{{ xfce_gtk_theme }}"
-  when: xfce_session_bus.stat.exists
-  changed_when: true
 
 - name: Refresh Numix icon caches
   ansible.builtin.command:
