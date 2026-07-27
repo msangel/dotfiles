@@ -52,3 +52,47 @@
         msg: |
           Public key for this machine:
           {{ ssh_public_key_result.stdout }}
+
+    - name: Read current Git user email
+      ansible.builtin.command:
+        argv:
+          - git
+          - config
+          - --global
+          - --get
+          - user.email
+      register: git_current_email
+      changed_when: false
+      failed_when: false
+
+    - name: Configure Git user email
+      ansible.builtin.command:
+        argv:
+          - git
+          - config
+          - --global
+          - user.email
+          - "{{ git_user_email }}"
+      when: (git_current_email.stdout | trim) != git_user_email
+
+    - name: Read current Git user name
+      ansible.builtin.command:
+        argv:
+          - git
+          - config
+          - --global
+          - --get
+          - user.name
+      register: git_current_name
+      changed_when: false
+      failed_when: false
+
+    - name: Configure Git user name
+      ansible.builtin.command:
+        argv:
+          - git
+          - config
+          - --global
+          - user.name
+          - "{{ git_user_name }}"
+      when: (git_current_name.stdout | trim) != git_user_name
