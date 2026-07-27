@@ -1,71 +1,95 @@
 ---
-    - name: Remove conflicting Docker packages
-      apt:
-        name:
-          - docker.io
-          - docker-compose
-          - docker-compose-v2
-          - docker-doc
-          - podman-docker
-          - hexchat
-          - pidgin
-          - engrampa
-          - mpv
-          - ayatana-indicator-application
-        state: absent
+- name: Remove unwanted and conflicting packages
+  ansible.builtin.apt:
+    name:
+      # Unwanted desktop applications
+      - hexchat
+      - pidgin
+      - thunderbird
+      - engrampa
+      - mpv
 
-    - name: Install required packages
-      apt:
-        name:
-          - wget
-          - gnupg
-          - ca-certificates
-          - curl
-          - util-linux-extra
-          - baobab
-          - peek
-          - gparted
-          - transmission
-          - apt-transport-https
-          - git
-          - vim
-          - kazam
-          - xrestop
-          - autoconf
-          - fonts-noto-color-emoji
-          - fastfetch
-          - indicator-cpufreq
-          - thunar-gtkhash
-          - net-tools
-          - conntrack
-          - telnet
-          - vlc
-          - arc-theme
-          - openconnect
-          - network-manager-openconnect
-          - network-manager-openconnect-gnome
-          - xarchiver
-          - playerctl
-          - seahorse
-          - mugshot
-          - build-essential
-          - atril
-          - libnotify-dev
-          - numix-icon-theme
-          - numix-icon-theme-circle
-          - jq
-          - tar
-          - unzip
-          - zip
-          - xfconf                    # default in Xubuntu
-          - dbus-x11                  # default in Xubuntu
-          - dconf-cli
-          - xdg-desktop-portal
-          - xdg-desktop-portal-gtk
-          - gawk
-          - libsqlite3-dev
-          - libtool
-          - libgmp-dev
-          - libperl-dev
-        state: present
-        cache_valid_time: 3600
+      # Unwanted screensavers and indicators
+      - xfce4-screensaver
+      - xscreensaver
+      - ayatana-indicator-application
+    state: absent
+    purge: true
+    autoremove: true
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      # Basic system utilities
+      - ca-certificates
+      - curl
+      - wget
+      - gnupg
+      - net-tools
+      - telnet
+      - conntrack
+      - inotify-tools
+      - util-linux-extra
+      - jq
+      - gawk
+      - tar
+      - unzip
+      - zip
+
+      # Development tools
+      - build-essential
+      - autoconf
+      - libtool
+      - libnotify-dev
+      - libsqlite3-dev
+      - libgmp-dev
+      - libperl-dev
+      - git
+      - vim
+      - pipx
+
+      # Desktop applications
+      - baobab
+      - mousepad
+      - peek
+      - kazam
+      - gparted
+      - transmission
+      - vlc
+      - xarchiver
+      - atril
+      - seahorse
+      - mugshot
+
+      # Desktop utilities
+      - xrestop
+      - fastfetch
+      - indicator-cpufreq
+      - kdocker
+      - thunar-gtkhash
+      - playerctl
+
+      # Themes and icons
+      - arc-theme
+      - numix-icon-theme
+      - numix-icon-theme-circle
+      - fonts-noto-color-emoji
+
+      # NetworkManager and VPN
+      - openconnect
+      - network-manager-openconnect
+      - network-manager-openconnect-gnome
+
+      # Xfce and desktop configuration
+      - xfconf
+      - dbus-x11
+      - dconf-cli
+      - xdg-desktop-portal
+      - xdg-desktop-portal-gtk
+
+      # Transitional package retained from original list
+      - apt-transport-https
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+    
