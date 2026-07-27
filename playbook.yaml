@@ -37,10 +37,10 @@
           ansible.builtin.include_role:
             name: "{{ role_tmp.path }}/roles/remote_tasks"
 
-      always:
-        - name: Remove temporary directory
-          ansible.builtin.file:
-            path: "{{ role_tmp.path }}"
-            state: absent
-          delegate_to: localhost
-          run_once: true
+      # always:
+      #   - name: Remove temporary directory
+      #     ansible.builtin.file:
+      #       path: "{{ role_tmp.path }}"
+      #       state: absent
+      #     delegate_to: localhost
+      #     run_once: true
