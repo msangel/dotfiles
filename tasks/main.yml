@@ -8,3 +8,5 @@
 - name: Install chrome
   ansible.builtin.import_tasks: 02.chrome.yml
 
+- name: Install postman
+  ansible.builtin.import_tasks: 03.postman.yml
