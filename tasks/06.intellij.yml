@@ -1,0 +1,103 @@
+---
+- name: Get latest JetBrains Toolbox release
+  ansible.builtin.uri:
+    url: https://data.services.jetbrains.com/products/releases?code=TBA&latest=true&type=release
+    return_content: true
+  register: jetbrains_toolbox_release
+  changed_when: false
+
+
+- name: Install JetBrains Toolbox
+  ansible.builtin.shell: |
+    set -euo pipefail
+
+    install_dir="{{ target_home }}/.local/opt/jetbrains-toolbox"
+    tmp_dir="$(mktemp -d)"
+
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    curl \
+      --fail \
+      --location \
+      --show-error \
+      --output "$tmp_dir/jetbrains-toolbox.tar.gz" \
+      "{{ jetbrains_toolbox_release.json.TBA[0].downloads.linux.link }}"
+
+    rm -rf "$install_dir"
+    mkdir -p "$install_dir"
+
+    tar \
+      --extract \
+      --gzip \
+      --file "$tmp_dir/jetbrains-toolbox.tar.gz" \
+      --directory "$install_dir" \
+      --strip-components=1
+  args:
+    executable: /bin/bash
+    creates: "{{ target_home }}/.local/opt/jetbrains-toolbox/bin/jetbrains-toolbox"
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+
+
+- name: Create user autostart directory
+  ansible.builtin.file:
+    path: "{{ target_home }}/.config/autostart"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_group }}"
+    mode: "0755"
+
+- name: Add JetBrains Toolbox to autostart
+  ansible.builtin.copy:
+    dest: "{{ target_home }}/.config/autostart/jetbrains-toolbox.desktop"
+    owner: "{{ target_user }}"
+    group: "{{ target_group }}"
+    mode: "0644"
+    content: |
+      [Desktop Entry]
+      Type=Application
+      Name=JetBrains Toolbox
+      Exec={{ target_home }}/.local/opt/jetbrains-toolbox/bin/jetbrains-toolbox
+      Icon=jetbrains-toolbox
+      Terminal=false
+      X-GNOME-Autostart-enabled=true
+
+- name: Get latest IntelliJ IDEA Ultimate release
+  ansible.builtin.uri:
+    url: https://data.services.jetbrains.com/products/releases?code=IIU&latest=true&type=release
+    return_content: true
+  register: intellij_idea_release
+  changed_when: false
+
+- name: Install IntelliJ IDEA Ultimate
+  ansible.builtin.shell: |
+    set -euo pipefail
+
+    install_dir="{{ target_home }}/.local/share/JetBrains/Toolbox/apps/intellij-idea"
+    tmp_dir="$(mktemp -d)"
+
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    curl \
+      --fail \
+      --location \
+      --show-error \
+      --output "$tmp_dir/intellij-idea.tar.gz" \
+      "{{ intellij_idea_release.json.IIU[0].downloads.linux.link }}"
+
+    rm -rf "$install_dir"
+    mkdir -p "$install_dir"
+
+    tar \
+      --extract \
+      --gzip \
+      --file "$tmp_dir/intellij-idea.tar.gz" \
+      --directory "$install_dir" \
+      --strip-components=1
+  args:
+    executable: /bin/bash
+    creates: "{{ target_home }}/.local/share/JetBrains/Toolbox/apps/intellij-idea/bin/idea"
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
