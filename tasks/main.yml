@@ -5,11 +5,11 @@
 - name: Install packages
   import_tasks: 01.packages.yml
 
-- name: Install chrome
-  import_tasks: 02.chrome.yml
+- name: Copy static
+  import_tasks: 02.static-files.yml
 
-- name: Install postman
-  import_tasks: 03.postman.yml
+- name: Install chrome
+  import_tasks: 03.chrome.yml
 
 - name: Install sdkman
   import_tasks: 04.sdkman.yml
@@ -40,6 +40,9 @@
 
 - name: configure bash-git-prompt
   import_tasks: 13.bash-git-prompt.yml
+
+- name: Install postman
+  import_tasks: 14.postman.yml
 
 - name: Ceanup
   import_tasks: 99.cleanup.yml
