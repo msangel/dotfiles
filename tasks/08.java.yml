@@ -1,0 +1,73 @@
+---
+- name: Install SDKMAN Java versions
+  ansible.builtin.shell: |
+    set -eo pipefail
+
+    export SDKMAN_DIR="{{ target_home }}/.sdkman"
+    source "$SDKMAN_DIR/bin/sdkman-init.sh"
+
+    changed=0
+
+    find_latest_java() {
+      major="$1"
+      vendor="$2"
+
+      sdk list java |
+        awk -F'|' '{
+          gsub(/^[ \t]+|[ \t]+$/, "", $NF)
+          print $NF
+        }' |
+        grep -E "^${major}\..*-${vendor}$" |
+        head -n 1
+    }
+
+    is_major_installed() {
+      major="$1"
+
+      find "$SDKMAN_DIR/candidates/java" \
+        -maxdepth 1 \
+        -mindepth 1 \
+        -type d \
+        -name "${major}.*" \
+        2>/dev/null |
+      grep -q .
+    }
+
+    for major in 8 11 17 21 25; do
+      if is_major_installed "$major"; then
+        continue
+      fi
+
+      java_version="$(
+        find_latest_java "$major" open || true
+      )"
+
+      if [ -z "$java_version" ]; then
+        java_version="$(
+          find_latest_java "$major" tem || true
+        )"
+      fi
+
+      if [ -z "$java_version" ]; then
+        echo \
+          "No SDKMAN Java version found for major=$major" \
+          >&2
+        exit 1
+      fi
+
+      printf 'n\n' |
+        sdk install java "$java_version"
+
+      changed=1
+    done
+
+    if [ "$changed" = "1" ]; then
+      echo changed
+    fi
+  args:
+    executable: /bin/bash
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  register: sdkman_java_install_result
+  changed_when: "'changed' in sdkman_java_install_result.stdout"
