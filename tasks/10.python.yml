@@ -1,0 +1,29 @@
+---
+- name: Install uv
+  ansible.builtin.shell: |
+    set -eo pipefail
+
+    curl \
+      --fail \
+      --silent \
+      --show-error \
+      --location \
+      https://astral.sh/uv/install.sh |
+    sh
+  args:
+    executable: /bin/bash
+    creates: "{{ target_home }}/.local/bin/uv"
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+    UV_NO_MODIFY_PATH: "1"
+
+- name: Verify uv
+  ansible.builtin.command:
+    argv:
+      - "{{ target_home }}/.local/bin/uv"
+      - --version
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  changed_when: false
