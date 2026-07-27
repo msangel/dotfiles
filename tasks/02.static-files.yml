@@ -6,3 +6,31 @@
     owner: root
     group: root
     mode: "0644"
+    
+- name: Resolve target user pictures directory
+  ansible.builtin.command:
+    argv:
+      - xdg-user-dir
+      - PICTURES
+  become: true
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  register: target_pictures_dir_result
+  changed_when: false
+
+- name: Create target user pictures directory
+  ansible.builtin.file:
+    path: "{{ target_pictures_dir_result.stdout }}"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_group }}"
+    mode: "0755"
+
+- name: Copy desktop backgrounds
+  ansible.builtin.copy:
+    src: backgrounds/
+    dest: "{{ target_pictures_dir_result.stdout }}/"
+    owner: "{{ target_user }}"
+    group: "{{ target_group }}"
+    directory_mode: "0755"
