@@ -1,0 +1,46 @@
+---
+- name: Download and execute temporary role
+  hosts: all
+
+  tasks:
+    - name: Create temporary directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: ansible-role-
+      delegate_to: localhost
+      run_once: true
+      register: role_tmp
+
+    - name: Download, execute and clean up role
+      block:
+        - name: Generate requirements file
+          ansible.builtin.copy:
+            dest: "{{ role_tmp.path }}/requirements.yml"
+            mode: "0600"
+            content: |
+              ---
+              - name: remote_tasks
+                src: https://github.com/msangel/dotfiles/archive/refs/heads/master.tar.gz
+          delegate_to: localhost
+          run_once: true
+
+        - name: Download role
+          community.general.ansible_galaxy_install:
+            type: role
+            requirements_file: "{{ role_tmp.path }}/requirements.yml"
+            dest: "{{ role_tmp.path }}/roles"
+            force: true
+          delegate_to: localhost
+          run_once: true
+
+        - name: Execute role
+          ansible.builtin.include_role:
+            name: "{{ role_tmp.path }}/roles/remote_tasks"
+
+      always:
+        - name: Remove temporary directory
+          ansible.builtin.file:
+            path: "{{ role_tmp.path }}"
+            state: absent
+          delegate_to: localhost
+          run_once: true
