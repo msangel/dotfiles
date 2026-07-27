@@ -1,12 +1,15 @@
 ---
 - name: Prepare role variables
-  ansible.builtin.import_tasks: 00.prepare.yml
+  import_tasks: 00.prepare.yml
 
 - name: Install packages
-  ansible.builtin.import_tasks: 01.packages.yml
+  import_tasks: 01.packages.yml
 
 - name: Install chrome
-  ansible.builtin.import_tasks: 02.chrome.yml
+  import_tasks: 02.chrome.yml
 
 - name: Install postman
-  ansible.builtin.import_tasks: 03.postman.yml
+  import_tasks: 03.postman.yml
+
+- name: Install sdkman
+  import_tasks: 04.sdkman.yml
