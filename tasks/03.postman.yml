@@ -1,0 +1,6 @@
+---
+- name: Install Postman
+  community.general.snap:
+    name: postman
+    state: present
+  when: not is_container
