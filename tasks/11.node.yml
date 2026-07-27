@@ -17,7 +17,7 @@
   environment:
     HOME: "{{ target_home }}"
     PROFILE: "{{ target_home }}/.bashrc"
-    NVM_DIR: "{{ target_home }}/.nvm"
+    NVM_DIR: "{{ target_home }}/.config/nvm"
   ansible.builtin.shell: |
     set -euo pipefail
 
