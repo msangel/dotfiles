@@ -1,0 +1,8 @@
+---
+- name: Install indicator-cpufreq Polkit rule
+  ansible.builtin.copy:
+    src: etc/polkit-1/rules.d/49-indicator-cpufreq.rules
+    dest: /etc/polkit-1/rules.d/49-indicator-cpufreq.rules
+    owner: root
+    group: root
+    mode: "0644"
