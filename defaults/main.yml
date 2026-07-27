@@ -1,0 +1,23 @@
+---
+is_container: >-
+  {{
+    ansible_facts.virtualization_type | default('')
+    in ['docker', 'containerd', 'podman']
+  }}
+
+target_user: >-
+  {{
+    lookup('env', 'TARGET_USER')
+    | default(lookup('env', 'SUDO_USER'), true)
+    | default(lookup('env', 'USER'), true)
+  }}
+
+numix_folder_style: "1"
+numix_folder_colour: blue
+
+xfce_gtk_theme: Arc-Dark
+xfce_icon_theme: Numix-Circle
+xfce_window_theme: Arc-Dark
+
+ruby_version: "3.4.10"
+rbenv_root: "{{ target_home }}/.rbenv"
