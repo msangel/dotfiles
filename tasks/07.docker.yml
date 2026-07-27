@@ -1,4 +1,10 @@
 ---
+- name: Create apt keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
 - name: Download Docker GPG key
   ansible.builtin.get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
@@ -62,89 +68,76 @@
     creates: "/var/lib/systemd/linger/{{ target_user }}"
   when: not is_container
 
-- name: Install Docker rootless service for target user
-  ansible.builtin.shell: |
-    set -euo pipefail
-
-    if systemctl --user is-enabled docker.service >/dev/null 2>&1; then
-      systemctl --user start docker.service
-      exit 0
-    fi
-
-    dockerd-rootless-setuptool.sh install --force
-
-    systemctl --user enable docker.service
-    systemctl --user start docker.service
-
-    echo changed
-  args:
-    executable: /bin/bash
+- name: Configure rootless Docker for target user
+  become: true
   become_user: "{{ target_user }}"
   environment:
     HOME: "{{ target_home }}"
     XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
     DBUS_SESSION_BUS_ADDRESS: >-
       unix:path=/run/user/{{ target_uid_result.stdout }}/bus
-  register: docker_rootless_result
-  changed_when: "'changed' in docker_rootless_result.stdout"
   when: not is_container
+  block:
+    - name: Install Docker rootless service
+      ansible.builtin.shell: |
+        set -euo pipefail
 
-- name: Create rootless Docker systemd override directory
-  ansible.builtin.file:
-    path: "{{ target_home }}/.config/systemd/user/docker.service.d"
-    state: directory
-    mode: "0755"
-  become_user: "{{ target_user }}"
-  when: not is_container
+        if systemctl --user is-enabled docker.service >/dev/null 2>&1; then
+          systemctl --user start docker.service
+          exit 0
+        fi
 
-- name: Configure rootless Docker host loopback access
-  ansible.builtin.copy:
-    dest: "{{ target_home }}/.config/systemd/user/docker.service.d/override.conf"
-    mode: "0644"
-    content: |
-      [Service]
-      Environment="DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false"
-  become_user: "{{ target_user }}"
-  register: docker_rootless_override_result
-  when: not is_container
+        dockerd-rootless-setuptool.sh install --force
 
-- name: Create rootless Docker config directory
-  ansible.builtin.file:
-    path: "{{ target_home }}/.config/docker"
-    state: directory
-    mode: "0755"
-  become_user: "{{ target_user }}"
-  when: not is_container
+        systemctl --user enable docker.service
+        systemctl --user start docker.service
 
-- name: Configure rootless Docker daemon
-  ansible.builtin.copy:
-    dest: "{{ target_home }}/.config/docker/daemon.json"
-    mode: "0644"
-    content: |
-      {
-        "host-gateway-ip": "10.0.2.2"
-      }
-  become_user: "{{ target_user }}"
-  register: docker_rootless_daemon_result
-  when: not is_container
+        echo changed
+      args:
+        executable: /bin/bash
+      register: docker_rootless_result
+      changed_when: "'changed' in docker_rootless_result.stdout"
 
-- name: Reload and restart rootless Docker after config change
-  ansible.builtin.shell: |
-    set -euo pipefail
+    - name: Create rootless Docker systemd override directory
+      ansible.builtin.file:
+        path: "{{ target_home }}/.config/systemd/user/docker.service.d"
+        state: directory
+        mode: "0755"
 
-    systemctl --user daemon-reload
-    systemctl --user restart docker.service
-  args:
-    executable: /bin/bash
-  become_user: "{{ target_user }}"
-  environment:
-    HOME: "{{ target_home }}"
-    XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
-    DBUS_SESSION_BUS_ADDRESS: >-
-      unix:path=/run/user/{{ target_uid_result.stdout }}/bus
-  when:
-    - not is_container
-    - >-
-      docker_rootless_override_result.changed
-      or docker_rootless_daemon_result.changed
-  changed_when: true
+    - name: Configure rootless Docker host loopback access
+      ansible.builtin.copy:
+        dest: "{{ target_home }}/.config/systemd/user/docker.service.d/override.conf"
+        mode: "0644"
+        content: |
+          [Service]
+          Environment="DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false"
+      register: docker_rootless_override_result
+
+    - name: Create rootless Docker config directory
+      ansible.builtin.file:
+        path: "{{ target_home }}/.config/docker"
+        state: directory
+        mode: "0755"
+
+    - name: Configure rootless Docker daemon
+      ansible.builtin.copy:
+        dest: "{{ target_home }}/.config/docker/daemon.json"
+        mode: "0644"
+        content: |
+          {
+            "host-gateway-ip": "10.0.2.2"
+          }
+      register: docker_rootless_daemon_result
+
+    - name: Reload and restart rootless Docker after config change
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        systemctl --user daemon-reload
+        systemctl --user restart docker.service
+      args:
+        executable: /bin/bash
+      when: >-
+        docker_rootless_override_result.changed
+        or docker_rootless_daemon_result.changed
+      changed_when: true
