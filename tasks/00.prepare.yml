@@ -1,0 +1,26 @@
+---
+- name: Resolve target user home
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ target_user }}"
+  when: target_home is not defined
+
+- name: Set target user home
+  ansible.builtin.set_fact:
+    target_home: "{{ ansible_facts.getent_passwd[target_user][4] }}"
+  when: target_home is not defined
+
+- name: Resolve target user primary group
+  ansible.builtin.command:
+    argv:
+      - id
+      - -gn
+      - "{{ target_user }}"
+  register: target_group_result
+  changed_when: false
+  when: target_group is not defined
+
+- name: Set target user primary group
+  ansible.builtin.set_fact:
+    target_group: "{{ target_group_result.stdout }}"
+  when: target_group is not defined
