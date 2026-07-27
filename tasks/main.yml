@@ -4,3 +4,7 @@
 
 - name: Install packages
   ansible.builtin.import_tasks: 01.packages.yml
+
+- name: Install chrome
+  ansible.builtin.import_tasks: 02.chrome.yml
+
