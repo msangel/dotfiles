@@ -25,4 +25,6 @@
 
 - name: Install java
   import_tasks: 08.java.yml
-  
+
+- name: Install ruby
+  import_tasks: 09.ruby.yml
