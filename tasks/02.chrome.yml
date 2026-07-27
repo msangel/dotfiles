@@ -1,0 +1,32 @@
+---
+- name: Check if Google Chrome is installed
+  command: dpkg-query -W -f='${Status}' google-chrome-stable
+  register: chrome_check
+  failed_when: false
+  changed_when: false
+
+- name: Create keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Google Chrome GPG key
+  get_url:
+    url: https://dl.google.com/linux/linux_signing_key.pub
+    dest: /etc/apt/keyrings/google-chrome.asc
+    mode: '0644'
+  when: chrome_check.rc != 0
+
+- name: Add Google Chrome repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main"
+    state: present
+    filename: google-chrome
+  register: chrome_repo_result
+
+- name: Install Google Chrome
+  apt:
+    name: google-chrome-stable
+    state: present
+    update_cache: "{{ chrome_repo_result.changed }}"
