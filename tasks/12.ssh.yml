@@ -1,0 +1,54 @@
+---
+- name: Configure SSH key for target user
+  become: true
+  become_user: "{{ target_user }}"
+  vars:
+    ssh_key_path: "{{ target_home }}/.ssh/id_rsa"
+    ssh_key_comment: h6.msangel@gmail.com
+  block:
+    - name: Create SSH directory
+      ansible.builtin.file:
+        path: "{{ target_home }}/.ssh"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_group }}"
+        mode: "0700"
+
+    - name: Check SSH private key
+      ansible.builtin.stat:
+        path: "{{ ssh_key_path }}"
+      register: ssh_private_key
+
+    - name: Check SSH public key
+      ansible.builtin.stat:
+        path: "{{ ssh_key_path }}.pub"
+      register: ssh_public_key
+
+    - name: Generate SSH key
+      ansible.builtin.command:
+        argv:
+          - ssh-keygen
+          - -t
+          - ed25519
+          - -C
+          - "{{ ssh_key_comment }}"
+          - -f
+          - "{{ ssh_key_path }}"
+          - -q
+          - -N
+          - ""
+      when: not ssh_public_key.stat.exists
+
+    - name: Read SSH public key
+      ansible.builtin.command:
+        argv:
+          - cat
+          - "{{ ssh_key_path }}.pub"
+      register: ssh_public_key_result
+      changed_when: false
+
+    - name: Show SSH public key
+      ansible.builtin.debug:
+        msg: |
+          Public key for this machine:
+          {{ ssh_public_key_result.stdout }}
