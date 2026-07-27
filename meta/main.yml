@@ -1,4 +1,0 @@
----
-- name: Test remote role
-  ansible.builtin.debug:
-    msg: "Роль успішно завантажена і запущена на {{ inventory_hostname }}"
