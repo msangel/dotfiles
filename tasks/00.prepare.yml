@@ -24,3 +24,12 @@
   ansible.builtin.set_fact:
     target_group: "{{ target_group_result.stdout }}"
   when: target_group is not defined
+
+- name: Get target user UID
+  ansible.builtin.command:
+    argv:
+      - id
+      - -u
+      - "{{ target_user }}"
+  register: target_uid_result
+  changed_when: false
