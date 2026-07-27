@@ -1,0 +1,130 @@
+---
+# see also
+# https://github.com/msangel/msangel.github.io/blob/master/README.md?plain=1
+- name: Install Ruby build dependencies
+  ansible.builtin.apt:
+    name:
+      - autoconf
+      - bison
+      - build-essential
+      - ca-certificates
+      - git
+      - libdb-dev
+      - libffi-dev
+      - libgdbm-dev
+      - libgmp-dev
+      - libncurses-dev
+      - libreadline-dev
+      - libssl-dev
+      - libyaml-dev
+      - pkg-config
+      - rustc
+      - uuid-dev
+      - zlib1g-dev
+    state: present
+
+- name: Install rbenv
+  ansible.builtin.git:
+    repo: https://github.com/rbenv/rbenv.git
+    dest: "{{ rbenv_root }}"
+    version: master
+    depth: 1
+    update: true
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+
+- name: Install ruby-build
+  ansible.builtin.git:
+    repo: https://github.com/rbenv/ruby-build.git
+    dest: "{{ rbenv_root }}/plugins/ruby-build"
+    version: master
+    depth: 1
+    update: true
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+
+- name: Configure rbenv for Bash
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.bashrc"
+    marker: "# {mark} ANSIBLE RBENV"
+    block: |
+      export RBENV_ROOT="$HOME/.rbenv"
+      export PATH="$RBENV_ROOT/bin:$PATH"
+      eval "$(rbenv init - bash)"
+    create: true
+    mode: "0644"
+  become_user: "{{ target_user }}"
+
+- name: Install Ruby
+  ansible.builtin.command:
+    argv:
+      - "{{ rbenv_root }}/bin/rbenv"
+      - install
+      - "{{ ruby_version }}"
+  args:
+    creates: "{{ rbenv_root }}/versions/{{ ruby_version }}/bin/ruby"
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+    RBENV_ROOT: "{{ rbenv_root }}"
+
+- name: Set default Ruby version
+  ansible.builtin.copy:
+    dest: "{{ rbenv_root }}/version"
+    content: "{{ ruby_version }}\n"
+    mode: "0644"
+  become_user: "{{ target_user }}"
+
+- name: Ensure Bundler is installed
+  ansible.builtin.shell: |
+    set -eo pipefail
+
+    ruby_dir="{{ rbenv_root }}/versions/{{ ruby_version }}"
+
+    if "$ruby_dir/bin/bundle" --version >/dev/null 2>&1; then
+      exit 0
+    fi
+
+    "$ruby_dir/bin/gem" install bundler --no-document
+
+    echo changed
+  args:
+    executable: /bin/bash
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+    RBENV_ROOT: "{{ rbenv_root }}"
+  register: bundler_install_result
+  changed_when: "'changed' in bundler_install_result.stdout"
+
+- name: Refresh rbenv shims
+  ansible.builtin.command:
+    argv:
+      - "{{ rbenv_root }}/bin/rbenv"
+      - rehash
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+    RBENV_ROOT: "{{ rbenv_root }}"
+  changed_when: false
+
+- name: Verify Ruby OpenSSL and Bundler
+  ansible.builtin.shell: |
+    set -eo pipefail
+
+    ruby_dir="{{ rbenv_root }}/versions/{{ ruby_version }}"
+
+    "$ruby_dir/bin/ruby" \
+      -ropenssl \
+      -e 'puts "Ruby: #{RUBY_VERSION}"; puts "OpenSSL: #{OpenSSL::OPENSSL_VERSION}"'
+
+    "$ruby_dir/bin/bundle" --version
+  args:
+    executable: /bin/bash
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+    RBENV_ROOT: "{{ rbenv_root }}"
+  changed_when: false
