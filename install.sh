@@ -9,19 +9,19 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ "$DOWNLOAD_PLAYBOOK" == true ]]; then
     WORK_DIR="$(mktemp -d)"
-    PLAYBOOK="$WORK_DIR/ansible.yaml"
+    PLAYBOOK="$WORK_DIR/playbook.yaml"
 
     trap 'rm -rf "$WORK_DIR"' EXIT
 
-    echo "Downloading ansible.yaml..."
+    echo "Downloading playbook.yml..."
 
     curl -fsSL \
-        "$RAW_REPO_URL/ansible.yaml" \
+        "$RAW_REPO_URL/playbook.yaml" \
         -o "$PLAYBOOK"
 
     echo "File downloaded to [$PLAYBOOK]"
 elif [[ "$DOWNLOAD_PLAYBOOK" == false ]]; then
-    PLAYBOOK="$SCRIPT_DIR/ansible.yaml"
+    PLAYBOOK="$SCRIPT_DIR/playbook.yaml"
 
     if [[ ! -f "$PLAYBOOK" ]]; then
         echo "Not found: $PLAYBOOK" >&2
