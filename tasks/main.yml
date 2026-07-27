@@ -1,4 +1,3 @@
 ---
-- name: Test remote role
-  ansible.builtin.debug:
-    msg: "Роль успішно завантажена і запущена на {{ inventory_hostname }}"
+- name: Run package tasks
+  ansible.builtin.import_tasks: 01.packages.yml
