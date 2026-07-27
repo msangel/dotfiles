@@ -46,36 +46,5 @@ docker run --rm -it \
     * retasker: https://www.omgubuntu.co.uk/2013/12/turn-headphone-jack-microphone-jack-ubuntu
     * ru forum: https://4pda.ru/forum/index.php?showtopic=910434
     * working solution: https://kdi.net.ua/mini-usb-mikrofon-dlya-noutbuka/
-* type C charger: 19.5V 2.25A
-* mouse manhattan 177474
-* gamepad https://askubuntu.com/questions/32031/how-do-i-configure-a-joystick-or-gamepad
 
 service: http://team.ua/team-service-centre/warranty/brands/
-
-# wallpaper
-https://www.pling.com/p/1337517/
-https://chrome.google.com/webstore/detail/james-white/bkeidgmehkdjmpjodpjkepolokanalkm
-
-# face auth
-https://github.com/boltgolt/howdy
-
-# power management 
-http://tdkare.ru/sysadmin/index.php/Preload
-http://tdkare.ru/sysadmin/index.php/Prelink
-
-# gestures
-https://gist.github.com/darcyparker/3d89e7851fc10992000e
-
-dm:
-cat /etc/X11/default-display-manager
-/usr/sbin/lightdm
-
-antlr
-cisco
-etcher
-jd-gui
-mindustry
-openconnect
-TeradataStudioExpress
-tomcat
-visualvm
