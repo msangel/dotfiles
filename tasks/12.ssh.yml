@@ -5,6 +5,10 @@
   vars:
     ssh_key_path: "{{ target_home }}/.ssh/id_rsa"
     ssh_key_comment: h6.msangel@gmail.com
+    
+    git_user_email: h6.msangel@gmail.com
+    git_user_name: Vasyl Khrystiuk
+  
   block:
     - name: Create SSH directory
       ansible.builtin.file:
