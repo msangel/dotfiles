@@ -1,0 +1,61 @@
+---
+- name: Get latest NVM release
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/nvm-sh/nvm/releases/latest
+    method: GET
+    headers:
+      Accept: application/vnd.github+json
+      X-GitHub-Api-Version: "2022-11-28"
+    return_content: true
+    status_code: 200
+  register: nvm_latest_release
+  changed_when: false
+
+- name: Install latest NVM and Node.js
+  become: true
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+    PROFILE: "{{ target_home }}/.bashrc"
+    NVM_DIR: "{{ target_home }}/.nvm"
+  ansible.builtin.shell: |
+    set -euo pipefail
+
+    desired_nvm_version="{{ nvm_latest_release.json.tag_name }}"
+    installed_nvm_version=""
+
+    if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+      source "$NVM_DIR/nvm.sh"
+      installed_nvm_version="v$(nvm --version)"
+    fi
+
+    changed=false
+
+    if [[ "$installed_nvm_version" != "$desired_nvm_version" ]]; then
+      curl -fsSL \
+        "https://raw.githubusercontent.com/nvm-sh/nvm/${desired_nvm_version}/install.sh" |
+        bash
+
+      changed=true
+    fi
+
+    source "$NVM_DIR/nvm.sh"
+
+    node_before="$(nvm version default 2>/dev/null || true)"
+
+    nvm install node
+    nvm alias default node
+
+    node_after="$(nvm version default)"
+
+    if [[ "$node_before" != "$node_after" ]]; then
+      changed=true
+    fi
+
+    if [[ "$changed" == true ]]; then
+      echo ansible_changed
+    fi
+  args:
+    executable: /bin/bash
+  register: nvm_node_install_result
+  changed_when: "'ansible_changed' in nvm_node_install_result.stdout"
