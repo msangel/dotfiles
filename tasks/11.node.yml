@@ -1,6 +1,6 @@
 ---
 - name: Get latest NVM release
-  ansible.builtin.uri:
+  uri:
     url: https://api.github.com/repos/nvm-sh/nvm/releases/latest
     method: GET
     headers:
@@ -59,3 +59,29 @@
     executable: /bin/bash
   register: nvm_node_install_result
   changed_when: "'ansible_changed' in nvm_node_install_result.stdout"
+
+- name: Verify Node.js version installed through NVM
+shell: |
+  set -euo pipefail
+
+  source "$NVM_DIR/nvm.sh"
+  nvm use default --silent >/dev/null
+
+  nvm_version="$(nvm current)"
+  node_version="$(node --version)"
+
+  if [[ "$nvm_version" == "none" || "$nvm_version" != "$node_version" ]]; then
+    echo "NVM version: $nvm_version, Node version: $node_version" >&2
+    exit 1
+  fi
+
+  echo "$node_version"
+args:
+  executable: /bin/bash
+become: true
+become_user: "{{ target_user }}"
+environment:
+  HOME: "{{ target_home }}"
+  NVM_DIR: "{{ target_home }}/.config/nvm"
+register: node_version_result
+changed_when: false
