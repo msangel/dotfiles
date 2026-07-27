@@ -38,6 +38,8 @@
 - name: configure ssh
   import_tasks: 12.ssh.yml
 
+- name: configure bash-git-prompt
+  import_tasks: 13.bash-git-prompt.yml
+
 - name: Ceanup
   import_tasks: 99.cleanup.yml
-
