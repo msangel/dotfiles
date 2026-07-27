@@ -1,3 +1,6 @@
 ---
-- name: Run package tasks
+- name: Prepare role variables
+  ansible.builtin.import_tasks: 00.prepare.yml
+
+- name: Install packages
   ansible.builtin.import_tasks: 01.packages.yml
