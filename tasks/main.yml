@@ -31,4 +31,6 @@
 
 - name: Install python
   import_tasks: 10.python.yml
-  
+
+- name: Ceanup
+  import_tasks: 99.cleanup.yml
