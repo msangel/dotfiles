@@ -13,6 +13,25 @@
 
     - name: Download, execute and clean up role
       block:
+        - name: Get current master commit SHA
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/msangel/dotfiles/git/ref/heads/master
+            method: GET
+            headers:
+              Accept: application/vnd.github+json
+              X-GitHub-Api-Version: "2022-11-28"
+            status_code: 200
+            return_content: true
+          delegate_to: localhost
+          run_once: true
+          register: github_ref
+          changed_when: false
+
+        - name: Show resolved commit SHA
+          ansible.builtin.debug:
+            msg: "Using commit {{ github_ref.json.object.sha }}"
+          run_once: true
+
         - name: Generate requirements file
           ansible.builtin.copy:
             dest: "{{ role_tmp.path }}/requirements.yml"
@@ -20,7 +39,7 @@
             content: |
               ---
               - name: remote_tasks
-                src: https://github.com/msangel/dotfiles/archive/refs/heads/master.tar.gz
+                src: https://github.com/msangel/dotfiles/archive/{{ github_ref.json.object.sha }}.tar.gz
           delegate_to: localhost
           run_once: true
 
