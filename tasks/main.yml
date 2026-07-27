@@ -16,3 +16,7 @@
 
 - name: Configure XFCE
   import_tasks: 05.xfce.yml
+
+- name: Install Intellij
+  import_tasks: 06.intellij.yml
+  
