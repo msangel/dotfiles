@@ -1,0 +1,150 @@
+---
+- name: Download Docker GPG key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+  register: docker_gpg_key_result
+
+- name: Add Docker apt repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/docker.sources
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: https://download.docker.com/linux/ubuntu
+      Suites: {{ ansible_facts.distribution_release }}
+      Components: stable
+      Architectures: amd64
+      Signed-By: /etc/apt/keyrings/docker.asc
+  register: docker_repo_result
+
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+      - docker-ce-rootless-extras
+      - uidmap
+      - dbus-user-session
+      - slirp4netns
+      - fuse-overlayfs
+    state: present
+    update_cache: >-
+      {{
+        docker_gpg_key_result.changed
+        or docker_repo_result.changed
+      }}
+
+- name: Enable and start rootful Docker
+  ansible.builtin.systemd_service:
+    name: docker
+    enabled: true
+    state: started
+  when: not is_container
+
+- name: Add target user to docker group
+  ansible.builtin.user:
+    name: "{{ target_user }}"
+    groups: docker
+    append: true
+
+- name: Enable lingering for target user
+  ansible.builtin.command:
+    argv:
+      - loginctl
+      - enable-linger
+      - "{{ target_user }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ target_user }}"
+  when: not is_container
+
+- name: Install Docker rootless service for target user
+  ansible.builtin.shell: |
+    set -euo pipefail
+
+    if systemctl --user is-enabled docker.service >/dev/null 2>&1; then
+      systemctl --user start docker.service
+      exit 0
+    fi
+
+    dockerd-rootless-setuptool.sh install --force
+
+    systemctl --user enable docker.service
+    systemctl --user start docker.service
+
+    echo changed
+  args:
+    executable: /bin/bash
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+    XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
+    DBUS_SESSION_BUS_ADDRESS: >-
+      unix:path=/run/user/{{ target_uid_result.stdout }}/bus
+  register: docker_rootless_result
+  changed_when: "'changed' in docker_rootless_result.stdout"
+  when: not is_container
+
+- name: Create rootless Docker systemd override directory
+  ansible.builtin.file:
+    path: "{{ target_home }}/.config/systemd/user/docker.service.d"
+    state: directory
+    mode: "0755"
+  become_user: "{{ target_user }}"
+  when: not is_container
+
+- name: Configure rootless Docker host loopback access
+  ansible.builtin.copy:
+    dest: "{{ target_home }}/.config/systemd/user/docker.service.d/override.conf"
+    mode: "0644"
+    content: |
+      [Service]
+      Environment="DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false"
+  become_user: "{{ target_user }}"
+  register: docker_rootless_override_result
+  when: not is_container
+
+- name: Create rootless Docker config directory
+  ansible.builtin.file:
+    path: "{{ target_home }}/.config/docker"
+    state: directory
+    mode: "0755"
+  become_user: "{{ target_user }}"
+  when: not is_container
+
+- name: Configure rootless Docker daemon
+  ansible.builtin.copy:
+    dest: "{{ target_home }}/.config/docker/daemon.json"
+    mode: "0644"
+    content: |
+      {
+        "host-gateway-ip": "10.0.2.2"
+      }
+  become_user: "{{ target_user }}"
+  register: docker_rootless_daemon_result
+  when: not is_container
+
+- name: Reload and restart rootless Docker after config change
+  ansible.builtin.shell: |
+    set -euo pipefail
+
+    systemctl --user daemon-reload
+    systemctl --user restart docker.service
+  args:
+    executable: /bin/bash
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+    XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
+    DBUS_SESSION_BUS_ADDRESS: >-
+      unix:path=/run/user/{{ target_uid_result.stdout }}/bus
+  when:
+    - not is_container
+    - >-
+      docker_rootless_override_result.changed
+      or docker_rootless_daemon_result.changed
+  changed_when: true
