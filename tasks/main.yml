@@ -22,4 +22,7 @@
   
 - name: Install docker
   import_tasks: 07.docker.yml
+
+- name: Install java
+  import_tasks: 08.java.yml
   
