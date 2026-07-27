@@ -20,3 +20,6 @@
 - name: Install Intellij
   import_tasks: 06.intellij.yml
   
+- name: Install docker
+  import_tasks: 07.docker.yml
+  
