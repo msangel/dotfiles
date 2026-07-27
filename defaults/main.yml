@@ -13,7 +13,7 @@ target_user: >-
   }}
 
 numix_folder_style: "1"
-numix_folder_colour: blue
+numix_folder_colour: blue #green
 
 xfce_gtk_theme: Arc-Dark
 xfce_icon_theme: Numix-Circle
@@ -21,3 +21,40 @@ xfce_window_theme: Arc-Dark
 
 ruby_version: "3.4.10"
 rbenv_root: "{{ target_home }}/.rbenv"
+
+
+xfce_settings:
+    - channel: xsettings
+      property: /Net/ThemeName
+      value: "{{ xfce_gtk_theme }}"
+      type: string
+
+    - channel: xsettings
+      property: /Net/IconThemeName
+      value: "{{ xfce_icon_theme }}"
+      type: string
+
+    - channel: xfwm4
+      property: /general/theme
+      value: "{{ xfce_window_theme }}"
+      type: string
+
+    - channel: xfwm4
+      property: /general/mousewheel_rollup
+      value: "false"
+      type: bool
+
+    - channel: thunar
+      property: /last-show-hidden
+      value: "true"
+      type: bool
+
+    - channel: xfwm4
+      property: /general/workspace_count
+      value: "1"
+      type: int
+
+    - channel: xfce4-terminal
+      property: /scrolling-unlimited
+      value: "true"
+      type: bool
