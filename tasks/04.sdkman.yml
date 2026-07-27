@@ -1,0 +1,11 @@
+---
+- name: Install SDKMAN
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl --fail --silent --show-error --location https://get.sdkman.io | bash
+  args:
+    executable: /bin/bash
+    creates: "{{ target_home }}/.sdkman/bin/sdkman-init.sh"
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
