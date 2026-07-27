@@ -13,3 +13,6 @@
 
 - name: Install sdkman
   import_tasks: 04.sdkman.yml
+
+- name: Configure XFCE
+  import_tasks: 05.xfce.yml
