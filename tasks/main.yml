@@ -28,3 +28,7 @@
 
 - name: Install ruby
   import_tasks: 09.ruby.yml
+
+- name: Install python
+  import_tasks: 10.python.yml
+  
