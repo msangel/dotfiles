@@ -1,0 +1,71 @@
+---
+    - name: Remove conflicting Docker packages
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+          - docker-compose-v2
+          - docker-doc
+          - podman-docker
+          - hexchat
+          - pidgin
+          - engrampa
+          - mpv
+          - ayatana-indicator-application
+        state: absent
+
+    - name: Install required packages
+      apt:
+        name:
+          - wget
+          - gnupg
+          - ca-certificates
+          - curl
+          - util-linux-extra
+          - baobab
+          - peek
+          - gparted
+          - transmission
+          - apt-transport-https
+          - git
+          - vim
+          - kazam
+          - xrestop
+          - autoconf
+          - fonts-noto-color-emoji
+          - fastfetch
+          - indicator-cpufreq
+          - thunar-gtkhash
+          - net-tools
+          - conntrack
+          - telnet
+          - vlc
+          - arc-theme
+          - openconnect
+          - network-manager-openconnect
+          - network-manager-openconnect-gnome
+          - xarchiver
+          - playerctl
+          - seahorse
+          - mugshot
+          - build-essential
+          - atril
+          - libnotify-dev
+          - numix-icon-theme
+          - numix-icon-theme-circle
+          - jq
+          - tar
+          - unzip
+          - zip
+          - xfconf                    # default in Xubuntu
+          - dbus-x11                  # default in Xubuntu
+          - dconf-cli
+          - xdg-desktop-portal
+          - xdg-desktop-portal-gtk
+          - gawk
+          - libsqlite3-dev
+          - libtool
+          - libgmp-dev
+          - libperl-dev
+        state: present
+        cache_valid_time: 3600
