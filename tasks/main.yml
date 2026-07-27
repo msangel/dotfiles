@@ -35,5 +35,9 @@
 - name: Install node
   import_tasks: 11.node.yml
 
+- name: configure ssh
+  import_tasks: 12.ssh.yml
+
 - name: Ceanup
   import_tasks: 99.cleanup.yml
+
