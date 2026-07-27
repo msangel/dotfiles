@@ -1,0 +1,29 @@
+---
+- name: Configure SSH key for target user
+  become: true
+  become_user: "{{ target_user }}"
+  vars:
+    ssh_key_path: "{{ target_home }}/.ssh/id_rsa"
+    ssh_key_comment: h6.msangel@gmail.com
+  block:
+    - name: Install bash-git-prompt
+      ansible.builtin.git:
+        repo: https://github.com/magicmonty/bash-git-prompt.git
+        dest: "{{ target_home }}/.bash-git-prompt"
+        version: master
+        depth: 1
+        update: true
+
+    - name: Enable bash-git-prompt
+      ansible.builtin.blockinfile:
+        path: "{{ target_home }}/.bashrc"
+        create: true
+        owner: "{{ target_user }}"
+        group: "{{ target_group }}"
+        mode: "0644"
+        marker: "# {mark} ANSIBLE MANAGED BASH GIT PROMPT"
+        block: |
+          if [ -f "$HOME/.bash-git-prompt/gitprompt.sh" ]; then
+            export GIT_PROMPT_THEME=Single_line_Dark
+            source "$HOME/.bash-git-prompt/gitprompt.sh"
+          fi
