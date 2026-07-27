@@ -1,4 +1,15 @@
 ---
+- name: Remove Docker packages conflicting with Docker CE
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-compose
+      - docker-compose-v2
+      - docker-doc
+      - podman-docker
+    state: absent
+    purge: true
+
 - name: Create apt keyrings directory
   ansible.builtin.file:
     path: /etc/apt/keyrings
