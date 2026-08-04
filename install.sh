@@ -2,10 +2,32 @@
 
 set -Eeuo pipefail
 
-DOWNLOAD_PLAYBOOK=true
+DOWNLOAD_PLAYBOOK=false
+USE_LOCAL_ROLE=true
+LOG_LEVEL=0
+
+if [[ "$DOWNLOAD_PLAYBOOK" != true && "$DOWNLOAD_PLAYBOOK" != false ]]; then
+    echo "DOWNLOAD_PLAYBOOK must be true or false" >&2
+    exit 1
+fi
+
+if [[ "$USE_LOCAL_ROLE" != true && "$USE_LOCAL_ROLE" != false ]]; then
+    echo "USE_LOCAL_ROLE must be true or false" >&2
+    exit 1
+fi
+
+if [[ ! "$LOG_LEVEL" =~ ^[0-4]$ ]]; then
+    echo "LOG_LEVEL must be an integer from 0 to 4" >&2
+    exit 1
+fi
 
 RAW_REPO_URL="https://raw.githubusercontent.com/msangel/dotfiles/master"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ "$USE_LOCAL_ROLE" == true && ! -f "$SCRIPT_DIR/tasks/main.yml" ]]; then
+    echo "USE_LOCAL_ROLE=true requires local role files next to install.sh" >&2
+    exit 1
+fi
 
 if [[ "$DOWNLOAD_PLAYBOOK" == true ]]; then
     WORK_DIR="$(mktemp -d)"
@@ -58,18 +80,38 @@ fi
 hash -r
 
 ANSIBLE_ARGS=(
-    -vvv
     -i localhost,
     --connection=local
     -e "target_user=$TARGET_USER"
     -e "target_home=$TARGET_HOME"
     -e "ansible_python_interpreter=$(command -v python3)"
+    -e "use_local_role=$USE_LOCAL_ROLE"
+    -e "local_role_path=$SCRIPT_DIR"
 )
+
+ANSIBLE_ENV=()
+
+if (( LOG_LEVEL == 0 )); then
+    ANSIBLE_ENV+=(
+        ANSIBLE_DISPLAY_OK_HOSTS=false
+        ANSIBLE_DISPLAY_SKIPPED_HOSTS=false
+    )
+fi
+
+if (( LOG_LEVEL > 0 )); then
+    verbosity=""
+
+    for ((i = 0; i < LOG_LEVEL; i++)); do
+        verbosity+="v"
+    done
+
+    ANSIBLE_ARGS+=("-$verbosity")
+fi
 
 if [[ "$EUID" -ne 0 ]]; then
     ANSIBLE_ARGS+=(--ask-become-pass)
 fi
 
-ansible-playbook \
+env "${ANSIBLE_ENV[@]}" ansible-playbook \
     "${ANSIBLE_ARGS[@]}" \
     "$PLAYBOOK"

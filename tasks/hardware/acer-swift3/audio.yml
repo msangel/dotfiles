@@ -1,0 +1,756 @@
+---
+- name: Load tested Swift 3 audio stack
+  ansible.builtin.include_vars:
+    file: "{{ role_path }}/vars/hardware/acer-swift3-audio.yml"
+
+- name: Initialize Swift 3 audio state
+  ansible.builtin.set_fact:
+    swift3_audio_reboot_required: false
+    swift3_audio_runtime_available: false
+
+- name: Verify Swift 3 hardware identity
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system_vendor == swift3_audio_tested_platform.system_vendor
+      - ansible_facts.product_name == swift3_audio_tested_platform.product_name
+      - ansible_facts.product_version == swift3_audio_tested_platform.product_version
+      - ansible_facts.board_name == swift3_audio_tested_platform.board_name
+      - ansible_facts.bios_version == swift3_audio_tested_platform.bios_version
+    fail_msg: >-
+      This task was generated for Acer Swift SF315-52,
+      board Erdinger_KL, BIOS V1.08.
+      Actual hardware:
+      vendor={{ ansible_facts.system_vendor }},
+      product={{ ansible_facts.product_name }},
+      product_version={{ ansible_facts.product_version }},
+      board={{ ansible_facts.board_name }},
+      bios={{ ansible_facts.bios_version }}.
+
+- name: Verify operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == swift3_audio_tested_platform.distribution
+      - ansible_facts.distribution_version == swift3_audio_tested_platform.version
+      - ansible_facts.distribution_release == swift3_audio_tested_platform.codename
+      - ansible_facts.architecture == swift3_audio_tested_platform.architecture
+    fail_msg: >-
+      Unsupported operating system.
+      Tested:
+      {{ swift3_audio_tested_platform.distribution }}
+      {{ swift3_audio_tested_platform.version }}
+      {{ swift3_audio_tested_platform.codename }}
+      {{ swift3_audio_tested_platform.architecture }}.
+      Actual:
+      {{ ansible_facts.distribution }}
+      {{ ansible_facts.distribution_version }}
+      {{ ansible_facts.distribution_release }}
+      {{ ansible_facts.architecture }}.
+
+- name: Read initially installed packages
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Remember whether AVS firmware package was missing
+  ansible.builtin.set_fact:
+    swift3_audio_firmware_package_was_missing: >-
+      {{
+        'linux-firmware-intel-misc'
+        not in ansible_facts.packages
+      }}
+
+- name: Install Swift 3 audio dependencies
+  become: true
+  ansible.builtin.apt:
+    name: "{{ swift3_audio_required_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Read installed package versions
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Verify tested package versions
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          ansible_facts.packages.get(item.key, [{}])
+          | first
+        ).get('version', 'MISSING') == item.value
+    fail_msg: >-
+      Untested package version for {{ item.key }}.
+      Expected={{ item.value }},
+      actual={{
+        (
+          ansible_facts.packages.get(item.key, [{}])
+          | first
+        ).get('version', 'MISSING')
+      }}.
+      Regenerate or review the Swift 3 audio role before continuing.
+  loop: "{{ swift3_audio_tested_packages | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: swift3_audio_enforce_tested_stack | bool
+
+- name: Verify tested running kernel
+  ansible.builtin.assert:
+    that:
+      - ansible_kernel == swift3_audio_tested_platform.running_kernel
+    fail_msg: >-
+      Untested running kernel.
+      Expected={{ swift3_audio_tested_platform.running_kernel }},
+      actual={{ ansible_kernel }}.
+      Regenerate or review the Swift 3 audio role before continuing.
+  when: swift3_audio_enforce_tested_stack | bool
+
+- name: Find forced legacy Intel DSP driver overrides
+  ansible.builtin.shell: |
+    grep \
+      --recursive \
+      --files-with-matches \
+      --extended-regexp \
+      --include='*.conf' \
+      '^[[:space:]]*options[[:space:]]+snd-intel-dspcfg([[:space:]]|$).*dsp_driver=1([[:space:]]|$)' \
+      /etc/modprobe.d 2>/dev/null || true
+  args:
+    executable: /bin/bash
+  register: swift3_audio_legacy_overrides
+  changed_when: false
+
+- name: Disable forced legacy Intel DSP driver overrides
+  become: true
+  ansible.builtin.shell: |
+    set -euo pipefail
+
+    source_file={{ item | quote }}
+    disabled_file="${source_file}.disabled"
+
+    if [[ -e "$disabled_file" || -L "$disabled_file" ]]; then
+      if cmp --silent -- "$source_file" "$disabled_file"; then
+        rm --force -- "$source_file"
+      else
+        echo "Backup collision: $disabled_file already exists" >&2
+        exit 1
+      fi
+    else
+      mv -- "$source_file" "$disabled_file"
+    fi
+  args:
+    executable: /bin/bash
+  loop: "{{ swift3_audio_legacy_overrides.stdout_lines }}"
+  loop_control:
+    label: "{{ item }}"
+  when: swift3_audio_legacy_overrides.stdout_lines | length > 0
+  register: swift3_audio_disabled_overrides
+
+- name: Rebuild initramfs after disabling legacy driver override
+  become: true
+  ansible.builtin.command:
+    argv:
+      - update-initramfs
+      - -u
+  when: swift3_audio_legacy_overrides.stdout_lines | length > 0
+
+- name: Mark reboot required after changing driver selection
+  ansible.builtin.set_fact:
+    swift3_audio_reboot_required: true
+  when: swift3_audio_legacy_overrides.stdout_lines | length > 0
+
+- name: Mark reboot required after installing AVS firmware
+  ansible.builtin.set_fact:
+    swift3_audio_reboot_required: true
+  when: swift3_audio_firmware_package_was_missing | bool
+
+- name: Reboot after driver or firmware changes
+  become: true
+  ansible.builtin.reboot:
+    msg: Rebooting to load the Swift 3 AVS audio stack
+    reboot_timeout: 600
+  when:
+    - swift3_audio_reboot_required | bool
+    - swift3_audio_reboot | bool
+
+- name: Refresh facts after reboot
+  ansible.builtin.setup:
+  when:
+    - swift3_audio_reboot_required | bool
+    - swift3_audio_reboot | bool
+
+- name: Clear reboot requirement after automatic reboot
+  ansible.builtin.set_fact:
+    swift3_audio_reboot_required: false
+  when:
+    - swift3_audio_reboot_required | bool
+    - swift3_audio_reboot | bool
+
+- name: Configure currently loaded AVS audio stack
+  when: not swift3_audio_reboot_required | bool
+  block:
+    - name: Detect target Intel audio PCI device
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        for device_path in /sys/bus/pci/devices/*; do
+          [[ -r "$device_path/vendor" ]] || continue
+          [[ -r "$device_path/device" ]] || continue
+          [[ -r "$device_path/subsystem_vendor" ]] || continue
+          [[ -r "$device_path/subsystem_device" ]] || continue
+
+          vendor="$(cat "$device_path/vendor")"
+          device="$(cat "$device_path/device")"
+          subsystem_vendor="$(cat "$device_path/subsystem_vendor")"
+          subsystem_device="$(cat "$device_path/subsystem_device")"
+
+          if [[
+            "$vendor" == "0x8086" &&
+            "$device" == "0x9d71" &&
+            "$subsystem_vendor" == "0x1025" &&
+            "$subsystem_device" == "0x1272"
+          ]]; then
+            driver="NONE"
+
+            if [[ -L "$device_path/driver" ]]; then
+              driver="$(basename "$(readlink -f "$device_path/driver")")"
+            fi
+
+            printf '%s|%s\n' "$device_path" "$driver"
+            exit 0
+          fi
+        done
+
+        exit 1
+      args:
+        executable: /bin/bash
+      register: swift3_audio_pci_device
+      changed_when: false
+
+    - name: Save detected PCI audio facts
+      ansible.builtin.set_fact:
+        swift3_audio_pci_path: >-
+          {{ swift3_audio_pci_device.stdout.split('|')[0] }}
+        swift3_audio_current_driver: >-
+          {{ swift3_audio_pci_device.stdout.split('|')[1] }}
+
+    - name: Verify active AVS driver
+      ansible.builtin.assert:
+        that:
+          - swift3_audio_current_driver == swift3_audio_tested_platform.driver
+        fail_msg: >-
+          The expected device was found, but its active driver is
+          {{ swift3_audio_current_driver }} instead of
+          {{ swift3_audio_tested_platform.driver }}.
+
+    - name: Detect HDA codec
+      ansible.builtin.shell: |
+        grep \
+          --with-filename \
+          '^Codec:' \
+          /proc/asound/card*/codec* \
+          2>/dev/null || true
+      args:
+        executable: /bin/bash
+      register: swift3_audio_codecs
+      changed_when: false
+
+    - name: Verify Realtek ALC256 codec
+      ansible.builtin.assert:
+        that:
+          - "'Realtek ALC256' in swift3_audio_codecs.stdout"
+        fail_msg: >-
+          Expected Realtek ALC256 codec was not detected.
+          Detected codecs:
+          {{ swift3_audio_codecs.stdout | default('none') }}
+
+    - name: Check required AVS firmware
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: true
+      loop: "{{ swift3_audio_required_firmware }}"
+      loop_control:
+        label: "{{ item | basename }}"
+      register: swift3_audio_firmware_files
+
+    - name: Verify required AVS firmware
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isreg
+        fail_msg: "Required AVS firmware is missing: {{ item.item }}"
+      loop: "{{ swift3_audio_firmware_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Check required UCM files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: true
+      loop: "{{ swift3_audio_required_ucm }}"
+      loop_control:
+        label: "{{ item | basename }}"
+      register: swift3_audio_ucm_files
+
+    - name: Verify required UCM files
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isreg
+        fail_msg: "Required ALSA UCM file is missing: {{ item.item }}"
+      loop: "{{ swift3_audio_ucm_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Detect AVS DMIC card dynamically
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        for card_path in /sys/class/sound/card[0-9]*; do
+          [[ -r "$card_path/id" ]] || continue
+
+          card_id="$(cat "$card_path/id")"
+
+          if [[ "$card_id" != "DMIC" ]]; then
+            continue
+          fi
+
+          card_name="$(basename "$card_path")"
+          card_number="${card_name#card}"
+
+          card_long_name="$(
+            awk -v card_number="$card_number" '
+              $1 == card_number {
+                line = $0
+                sub(/^.* - /, "", line)
+                print line
+                exit
+              }
+            ' /proc/asound/cards
+          )"
+
+          [[ -n "$card_long_name" ]] || exit 2
+
+          printf '%s|%s\n' "$card_number" "$card_long_name"
+          exit 0
+        done
+
+        exit 1
+      args:
+        executable: /bin/bash
+      register: swift3_audio_dmic_card
+      changed_when: false
+
+    - name: Save detected DMIC card facts
+      ansible.builtin.set_fact:
+        swift3_audio_dmic_card_number: >-
+          {{ swift3_audio_dmic_card.stdout.split('|')[0] }}
+        swift3_audio_dmic_long_name: >-
+          {{ swift3_audio_dmic_card.stdout.split('|')[1] }}
+
+    - name: Calculate dynamic UCM mapping path
+      ansible.builtin.set_fact:
+        swift3_audio_ucm_mapping_path: >-
+          /usr/share/alsa/ucm2/conf.d/avs_dmic/{{ swift3_audio_dmic_long_name }}.conf
+
+    - name: Test existing DMIC UCM mapping
+      ansible.builtin.command:
+        argv:
+          - alsaucm
+          - -c
+          - "hw:{{ swift3_audio_dmic_card_number }}"
+          - list
+          - _verbs
+      register: swift3_audio_ucm_before
+      changed_when: false
+      failed_when: false
+
+    - name: Check dynamic UCM mapping destination
+      ansible.builtin.stat:
+        path: "{{ swift3_audio_ucm_mapping_path }}"
+        follow: false
+      register: swift3_audio_mapping_before
+      when: >-
+        swift3_audio_ucm_before.rc != 0
+        or 'HiFi' not in swift3_audio_ucm_before.stdout
+
+    - name: Back up existing dynamic UCM mapping
+      become: true
+      ansible.builtin.command:
+        argv:
+          - cp
+          - -a
+          - --
+          - "{{ swift3_audio_ucm_mapping_path }}"
+          - "{{ swift3_audio_ucm_mapping_path }}.pre-ansible-backup"
+      args:
+        creates: "{{ swift3_audio_ucm_mapping_path }}.pre-ansible-backup"
+      when:
+        - >-
+          swift3_audio_ucm_before.rc != 0
+          or 'HiFi' not in swift3_audio_ucm_before.stdout
+        - >-
+          swift3_audio_mapping_before.stat.exists | default(false)
+          or swift3_audio_mapping_before.stat.islnk | default(false)
+
+    - name: Remove incorrect dynamic UCM mapping
+      become: true
+      ansible.builtin.file:
+        path: "{{ swift3_audio_ucm_mapping_path }}"
+        state: absent
+      when:
+        - >-
+          swift3_audio_ucm_before.rc != 0
+          or 'HiFi' not in swift3_audio_ucm_before.stdout
+        - >-
+          swift3_audio_mapping_before.stat.exists | default(false)
+          or swift3_audio_mapping_before.stat.islnk | default(false)
+
+    - name: Create dynamic DMIC UCM mapping
+      become: true
+      ansible.builtin.file:
+        src: Acer-Lars-1.0.conf
+        dest: "{{ swift3_audio_ucm_mapping_path }}"
+        state: link
+        force: true
+      register: swift3_audio_mapping_link
+      when: >-
+        swift3_audio_ucm_before.rc != 0
+        or 'HiFi' not in swift3_audio_ucm_before.stdout
+
+    - name: Verify DMIC UCM after mapping
+      ansible.builtin.command:
+        argv:
+          - alsaucm
+          - -c
+          - "hw:{{ swift3_audio_dmic_card_number }}"
+          - list
+          - _verbs
+      register: swift3_audio_ucm_after
+      changed_when: false
+
+    - name: Verify HiFi UCM verb
+      ansible.builtin.assert:
+        that:
+          - "'HiFi' in swift3_audio_ucm_after.stdout"
+        fail_msg: >-
+          UCM mapping still does not provide the HiFi verb.
+          Output:
+          {{ swift3_audio_ucm_after.stdout }}
+          {{ swift3_audio_ucm_after.stderr }}
+
+    - name: Activate DMIC HiFi UCM verb
+      ansible.builtin.command:
+        argv:
+          - alsaucm
+          - -c
+          - "hw:{{ swift3_audio_dmic_card_number }}"
+          - set
+          - _verb
+          - HiFi
+      changed_when: false
+
+    - name: Read DMIC mixer volume
+      ansible.builtin.command:
+        argv:
+          - amixer
+          - -c
+          - "{{ swift3_audio_dmic_card_number }}"
+          - cget
+          - "name=DMIC Volume"
+      register: swift3_audio_mixer_before
+      changed_when: false
+
+    - name: Set non-zero DMIC mixer volume
+      ansible.builtin.command:
+        argv:
+          - amixer
+          - -c
+          - "{{ swift3_audio_dmic_card_number }}"
+          - cset
+          - "name=DMIC Volume"
+          - "2147483647"
+      register: swift3_audio_mixer_changed
+      when: >-
+        (
+          swift3_audio_mixer_before.stdout
+          | regex_search('(?m)^[ \t]*: values=0[ \t]*$')
+        ) is not none
+
+    - name: Persist corrected ALSA mixer state
+      become: true
+      ansible.builtin.command:
+        argv:
+          - alsactl
+          - store
+          - "{{ swift3_audio_dmic_card_number }}"
+      when: swift3_audio_mixer_changed.changed | default(false)
+
+    - name: Create target user local binary directory
+      ansible.builtin.file:
+        path: "{{ target_home }}/.local/bin"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_group }}"
+        mode: "0755"
+
+    - name: Install Swift 3 PipeWire runtime fix
+      ansible.builtin.copy:
+        dest: "{{ target_home }}/.local/bin/swift3-audio-runtime"
+        owner: "{{ target_user }}"
+        group: "{{ target_group }}"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+
+          set -euo pipefail
+
+          export LC_ALL=C
+          export PATH=/usr/local/bin:/usr/bin:/bin
+
+          card_prefix={{ swift3_audio_pipewire_card | quote }}
+          preferred_source={{ swift3_audio_preferred_source | quote }}
+          changed=false
+          actual_card=""
+
+          for attempt in $(seq 1 30); do
+              if pactl info >/dev/null 2>&1; then
+                  break
+              fi
+
+              sleep 1
+          done
+
+          if ! pactl info >/dev/null 2>&1; then
+              echo "ANSIBLE_DEFERRED: PipeWire PulseAudio API is not available"
+              exit 0
+          fi
+
+          for attempt in $(seq 1 30); do
+              actual_card="$(
+                  pactl list short cards |
+                      awk -v card="$card_prefix" '
+                          $2 == card || index($2, card ".") == 1 {
+                              print $2
+                              exit
+                          }
+                      '
+              )"
+
+              if [[ -n "$actual_card" ]]; then
+                  break
+              fi
+
+              sleep 1
+          done
+
+          if [[ -z "$actual_card" ]]; then
+              echo "ANSIBLE_DEFERRED: PipeWire card matching $card_prefix was not created"
+              pactl list short cards || true
+              exit 0
+          fi
+
+          active_profile="$(
+              pactl list cards |
+                  awk -v card="$actual_card" '
+                      /^[[:space:]]*Name:/ {
+                          in_card = ($2 == card)
+                      }
+
+                      in_card && /^[[:space:]]*Active Profile:/ {
+                          print $3
+                          exit
+                      }
+                  '
+          )"
+
+          if [[ -z "$active_profile" ]]; then
+              echo "ANSIBLE_DEFERRED: PipeWire card $actual_card has no active profile"
+              exit 0
+          fi
+
+          if [[ "$active_profile" != "pro-audio" ]]; then
+              pactl set-card-profile "$actual_card" pro-audio
+              changed=true
+          fi
+
+          source_name=""
+
+          for attempt in $(seq 1 30); do
+              source_name="$(
+                  pactl list short sources |
+                      awk -v preferred="$preferred_source" '
+                          $2 == preferred {
+                              print $2
+                              exit
+                          }
+
+                          $2 ~ /^alsa_input\.platform-avs_dmic\./ {
+                              fallback = $2
+                          }
+
+                          END {
+                              if (fallback != "") {
+                                  print fallback
+                              }
+                          }
+                      ' |
+                      head -n 1
+              )"
+
+              if [[ -n "$source_name" ]]; then
+                  break
+              fi
+
+              sleep 1
+          done
+
+          if [[ -z "$source_name" ]]; then
+              echo "ANSIBLE_DEFERRED: AVS DMIC PipeWire source was not created"
+              pactl list short sources || true
+              exit 0
+          fi
+
+          current_default="$(
+              pactl info |
+                  sed -n 's/^Default Source: //p' |
+                  head -n 1
+          )"
+
+          if [[ "$current_default" != "$source_name" ]]; then
+              pactl set-default-source "$source_name"
+              changed=true
+          fi
+
+          if [[ "$changed" == true ]]; then
+              echo ANSIBLE_CHANGED
+          fi
+
+    - name: Create target user systemd directory
+      ansible.builtin.file:
+        path: "{{ target_home }}/.config/systemd/user"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_group }}"
+        mode: "0755"
+
+    - name: Install Swift 3 audio user service
+      ansible.builtin.copy:
+        dest: >-
+          {{ target_home }}/.config/systemd/user/swift3-audio-runtime.service
+        owner: "{{ target_user }}"
+        group: "{{ target_group }}"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Configure Acer Swift 3 AVS DMIC
+          After=pipewire.service pipewire-pulse.service wireplumber.service
+          Wants=pipewire.service pipewire-pulse.service wireplumber.service
+
+          [Service]
+          Type=oneshot
+          ExecStart=%h/.local/bin/swift3-audio-runtime
+
+          [Install]
+          WantedBy=default.target
+      register: swift3_audio_user_service
+
+    - name: Create target user default target wants directory
+      ansible.builtin.file:
+        path: "{{ target_home }}/.config/systemd/user/default.target.wants"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_group }}"
+        mode: "0755"
+
+    - name: Enable Swift 3 audio user service
+      ansible.builtin.file:
+        src: ../swift3-audio-runtime.service
+        dest: >-
+          {{ target_home }}/.config/systemd/user/default.target.wants/swift3-audio-runtime.service
+        state: link
+        owner: "{{ target_user }}"
+        group: "{{ target_group }}"
+
+    - name: Check target user session bus
+      ansible.builtin.stat:
+        path: "/run/user/{{ target_uid_result.stdout }}/bus"
+      register: swift3_audio_user_bus
+
+    - name: Restart user audio services after UCM or mixer changes
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - restart
+          - wireplumber.service
+          - pipewire.service
+          - pipewire-pulse.service
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+        XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
+        DBUS_SESSION_BUS_ADDRESS: >-
+          unix:path=/run/user/{{ target_uid_result.stdout }}/bus
+      when:
+        - swift3_audio_user_bus.stat.exists
+        - >-
+          swift3_audio_mapping_link.changed | default(false)
+          or swift3_audio_mixer_changed.changed | default(false)
+
+    - name: Reload target user systemd manager
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - daemon-reload
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+        XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
+        DBUS_SESSION_BUS_ADDRESS: >-
+          unix:path=/run/user/{{ target_uid_result.stdout }}/bus
+      changed_when: false
+      when:
+        - swift3_audio_user_bus.stat.exists
+        - swift3_audio_user_service.changed
+
+    - name: Apply PipeWire runtime configuration
+      ansible.builtin.command:
+        argv:
+          - "{{ target_home }}/.local/bin/swift3-audio-runtime"
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+        XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
+        DBUS_SESSION_BUS_ADDRESS: >-
+          unix:path=/run/user/{{ target_uid_result.stdout }}/bus
+      register: swift3_audio_runtime_result
+      changed_when: "'ANSIBLE_CHANGED' in swift3_audio_runtime_result.stdout"
+      when: swift3_audio_user_bus.stat.exists
+
+    - name: Report deferred PipeWire runtime configuration
+      ansible.builtin.debug:
+        msg: "{{ swift3_audio_runtime_result.stdout }}"
+      when:
+        - swift3_audio_user_bus.stat.exists
+        - "'ANSIBLE_DEFERRED' in swift3_audio_runtime_result.stdout"
+
+    - name: Report deferred PipeWire configuration
+      ansible.builtin.debug:
+        msg: >-
+          The target user's PipeWire session is not currently available.
+          The Swift 3 audio user service will apply the PipeWire profile
+          and default source at the next login.
+      when: not swift3_audio_user_bus.stat.exists
+
+- name: Stop when manual reboot is required
+  ansible.builtin.fail:
+    msg: >-
+      Swift 3 audio driver or firmware configuration changed.
+      Reboot the computer, then run install.sh again to continue.
+      Set swift3_audio_reboot=true if you want Ansible to reboot automatically.
+  when:
+    - swift3_audio_reboot_required | bool
+    - not swift3_audio_reboot | bool

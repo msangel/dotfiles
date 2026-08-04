@@ -1,0 +1,4 @@
+---
+- name: Configure Swift 3 AVS audio
+  ansible.builtin.import_tasks: acer-swift3/audio.yml
+  when: swift3_audio_enabled | bool

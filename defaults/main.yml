@@ -12,6 +12,13 @@ target_user: >-
     | default(lookup('env', 'USER'), true)
   }}
 
+is_swift3: >-
+  {{
+    (ansible_facts.system_vendor | default('') | trim | lower) == 'acer'
+    and
+    (ansible_facts.product_name | default('') | trim | lower) == 'swift sf315-52'
+  }}
+
 numix_folder_style: "1"
 numix_folder_colour: blue #green
 
@@ -23,6 +30,9 @@ ruby_version: "3.4.10"
 rbenv_root: "{{ target_home }}/.rbenv"
 xfce_custom_dpi: 128
 
+swift3_audio_enabled: true
+swift3_audio_enforce_tested_stack: true
+swift3_audio_reboot: false
 
 xfce_settings:
     - channel: xsettings

@@ -4,8 +4,15 @@
 
   vars:
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
-    
+    use_local_role_enabled: "{{ use_local_role | default(false) | bool }}"
+    local_role_path: "{{ local_role_path | default(playbook_dir, true) }}"
+
   tasks:
+    - name: Execute local role
+      ansible.builtin.include_role:
+        name: "{{ local_role_path }}"
+      when: use_local_role_enabled
+
     - name: Create temporary directory
       ansible.builtin.tempfile:
         state: directory
@@ -13,8 +20,10 @@
       delegate_to: localhost
       run_once: true
       register: role_tmp
+      when: not use_local_role_enabled
 
     - name: Download, execute and clean up role
+      when: not use_local_role_enabled
       block:
         - name: Get current master commit SHA
           ansible.builtin.uri:
@@ -66,3 +75,4 @@
             state: absent
           delegate_to: localhost
           run_once: true
+          when: role_tmp.path is defined

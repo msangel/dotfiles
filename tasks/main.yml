@@ -19,7 +19,7 @@
 
 - name: Install Intellij
   import_tasks: 06.intellij.yml
-  
+
 - name: Install docker
   import_tasks: 07.docker.yml
 
@@ -43,6 +43,10 @@
 
 - name: Install postman
   import_tasks: 14.postman.yml
+
+- name: Configure Acer Swift 3
+  ansible.builtin.import_tasks: hardware/acer-swift3.yml
+  when: is_swift3
 
 - name: Ceanup
   import_tasks: 99.cleanup.yml
