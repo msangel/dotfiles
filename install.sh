@@ -2,8 +2,8 @@
 
 set -Eeuo pipefail
 
-DOWNLOAD_PLAYBOOK=false
-USE_LOCAL_ROLE=true
+DOWNLOAD_PLAYBOOK=true
+USE_LOCAL_ROLE=false
 LOG_LEVEL=0
 
 if [[ "$DOWNLOAD_PLAYBOOK" != true && "$DOWNLOAD_PLAYBOOK" != false ]]; then
