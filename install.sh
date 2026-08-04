@@ -4,7 +4,7 @@ set -Eeuo pipefail
 
 DOWNLOAD_PLAYBOOK=true
 USE_LOCAL_ROLE=false
-LOG_LEVEL=0
+LOG_LEVEL=3
 
 if [[ "$DOWNLOAD_PLAYBOOK" != true && "$DOWNLOAD_PLAYBOOK" != false ]]; then
     echo "DOWNLOAD_PLAYBOOK must be true or false" >&2
