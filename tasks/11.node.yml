@@ -11,6 +11,15 @@
   register: nvm_latest_release
   changed_when: false
 
+- name: Create NVM directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ target_home }}/.config/nvm"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_group }}"
+    mode: "0755"
+
 - name: Install latest NVM and Node.js
   become: true
   become_user: "{{ target_user }}"
