@@ -21,6 +21,7 @@ xfce_window_theme: Arc-Dark
 
 ruby_version: "3.4.10"
 rbenv_root: "{{ target_home }}/.rbenv"
+xfce_custom_dpi: 128
 
 
 xfce_settings:
@@ -58,3 +59,14 @@ xfce_settings:
       property: /scrolling-unlimited
       value: "true"
       type: bool
+
+    - channel: xsettings
+      property: /Xft/DPI
+      value: "{{ xfce_custom_dpi }}"
+      type: int
+
+    - channel: xsettings
+      property: /Xfce/LastCustomDPI
+      value: "{{ xfce_custom_dpi }}"
+      type: int
+  
