@@ -1,5 +1,6 @@
 ---
 - name: Autoremove unused apt packages
+  become: true
   apt:
     autoremove: true
     purge: true
