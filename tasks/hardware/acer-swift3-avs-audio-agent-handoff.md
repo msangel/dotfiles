@@ -4,45 +4,39 @@
 
 **Дата фіксації контексту:** 2026-08-05, Europe/Kyiv  
 **Основний репозиторій:** https://github.com/msangel/dotfiles/tree/master  
-**Стан `master`, на якому складено документ:** `9ff4438a64b6621a566106442addd1397443cf82`  
+**Стан `master`, на якому оновлено документ:** `24470968d2019525ebbf32ead5a29332c35913db`
 **Коміт, що додав поточний AVS-фікс:** `8bbe09c9774b0d4b57379ed7689380ef49b2a974`
 
-- Поточний snapshot: https://github.com/msangel/dotfiles/tree/9ff4438a64b6621a566106442addd1397443cf82
+- Базовий snapshot: https://github.com/msangel/dotfiles/tree/24470968d2019525ebbf32ead5a29332c35913db
 - Коміт аудіофіксу: https://github.com/msangel/dotfiles/commit/8bbe09c9774b0d4b57379ed7689380ef49b2a974
 
 > **Правило для нового агента:** спочатку прочитати актуальний стан репозиторію та зібрати новий precheck з реальної машини. Цей документ пояснює логіку та історію, але поточний GitHub і фактична система є джерелами істини.
 
 ---
 
-## 1. Відповідь на питання про прив’язку до версії ядра
+## 1. Політика щодо версії ядра
 
-У поточній ролі **є пряма і жорстка прив’язка до версії ядра**, причому у двох місцях.
-
-У `vars/hardware/acer-swift3-audio.yml` зафіксовано:
-
-```yaml
-swift3_audio_tested_platform:
-  running_kernel: 7.0.0-28-generic
-
-swift3_audio_tested_packages:
-  linux-image-generic: 7.0.0-28.28
-```
-
-А в `tasks/hardware/acer-swift3/audio.yml` є окрема перевірка:
+Версія ядра **не є блокуючим version lock**. `linux-image-generic` не входить до
+`swift3_audio_tested_packages`, а відхилення поточного ядра від початково
+протестованого показує лише інформаційне повідомлення:
 
 ```yaml
-- name: Verify tested running kernel
-  ansible.builtin.assert:
-    that:
-      - ansible_kernel == swift3_audio_tested_platform.running_kernel
+- name: Report kernel version drift
+  ansible.builtin.debug:
+    msg: >-
+      Swift 3 audio was originally tested on
+      {{ swift3_audio_tested_platform.running_kernel }},
+      current kernel is {{ ansible_facts["kernel"] }}.
+      Capability checks will determine whether the fix still works.
+  when: >-
+    ansible_facts["kernel"]
+    != swift3_audio_tested_platform.running_kernel
 ```
 
-Тобто роль перевіряє:
+Поле `running_kernel` зберігає тільки історичну tested baseline. Воно не повинно
+зупиняти роль і не потребує оновлення після кожного штатного kernel update.
 
-1. версію встановленого метапакета `linux-image-generic`;
-2. фактично запущене ядро через `ansible_kernel`.
-
-Окрім цього, роль виконує **capability checks**, які важливіші для фактичної працездатності:
+Працездатність визначають **capability checks**:
 
 - активний драйвер PCI-пристрою має бути `snd_soc_avs`;
 - потрібні AVS topology firmware-файли мають існувати;
@@ -52,29 +46,63 @@ swift3_audio_tested_packages:
 - `DMIC Volume` має бути ненульовим;
 - PipeWire має створити карту і source.
 
-Отже, правильне формулювання:
+Саме ці перевірки, а не номер ядра, визначають, чи аудіофікс працює.
 
-> Версія ядра в поточному коді зафіксована як safety lock, але сама по собі вона не визначає, чи працює звук. Реальний результат залежить щонайменше від ядра, firmware, UCM, mixer state і PipeWire/WirePlumber.
+### Що реально потрібно після оновлення ядра
 
-### Важливий сценарій після оновлення ядра
+Щоб перевірити саме нововстановлене ядро, спочатку треба завантажитися в нього.
+Якщо воно вже активне, додатковий reboot не потрібен. Після цього достатньо
+виконати:
 
-Можливий стан:
+```bash
+uname -r
 
-```text
-linux-image-generic installed = 7.0.0-29.29
-uname -r                    = 7.0.0-28-generic
+lspci -nnk -s 00:1f.3
+
+DMIC_CARD="$(
+  for card in /sys/class/sound/card[0-9]*; do
+    [ "$(cat "$card/id" 2>/dev/null)" = "DMIC" ] || continue
+    basename "$card" | sed 's/^card//'
+    break
+  done
+)"
+
+alsaucm -c "hw:$DMIC_CARD" list _verbs
+amixer -c "$DMIC_CARD" cget "name=DMIC Volume"
+pactl list short sources | grep avs_dmic
 ```
 
-Це означає: нове ядро встановлене, але система ще працює на старому, бо не було reboot.
+Очікуваний результат:
 
-Не можна просто записати обидві нові версії в lock-файл. Правильний порядок:
+```text
+Kernel driver in use: snd_soc_avs
+HiFi
+DMIC Volume має ненульове значення
+alsa_input.platform-avs_dmic...
+```
 
-1. зафіксувати старий стан;
-2. перезавантажитися в нове ядро;
-3. переконатися через `uname -r`, що запущене саме воно;
-4. виконати повний precheck;
-5. протестувати всі аудіоканали;
-6. лише після цього оновити обидва version pins.
+Після цього зробити короткий тест запису:
+
+```bash
+timeout 5s pw-record \
+  --target alsa_input.platform-avs_dmic.pro-input-0 \
+  --channels 2 \
+  --rate 48000 \
+  /tmp/swift3-mic.wav || true
+
+pw-play /tmp/swift3-mic.wav
+```
+
+Якщо перевірки проходять і в записі чути голос, нічого в аудіофіксі та version
+pins змінювати не потрібно. Після цього достатньо запустити Ansible: він покаже
+kernel drift як довідкову інформацію на звичайному рівні логування і продовжить
+capability checks. За `LOG_LEVEL=0` успішний `debug` може бути прихований.
+
+Роль не вимагає reboot лише через kernel drift. Вона зупиняється з явною
+Ansible-помилкою та просить reboot тільки якщо під час запуску змінила boot-critical
+стан: вимкнула forced legacy driver override або вперше встановила AVS firmware.
+Після такого повідомлення треба перезавантажитися і повторно запустити
+`install.sh`. Якщо цих змін не було й checks пройшли, reboot не потрібен.
 
 ---
 
@@ -698,15 +726,22 @@ pulseaudio-utils
 swift3_audio_enforce_tested_stack: true
 ```
 
-`pulseaudio-utils` і `pciutils` зараз не включені до exact version lock. Вони розглядаються як diagnostic/runtime utilities, а не ядро протестованого audio stack.
+`linux-image-generic`, `libasound2t64`, `libasound2-data`, `alsa-utils`,
+`pulseaudio-utils` і `pciutils` не включені до exact version lock. Kernel
+контролюється capability checks, а ALSA libraries/utilities та diagnostic tools
+встановлюються без прив’язки до exact version.
 
-### Фаза D — kernel lock
+### Фаза D — інформація про kernel drift
 
-Окремо перевіряє:
+Якщо поточне ядро відрізняється від історичної tested baseline, роль повідомляє:
 
 ```text
-ansible_kernel == 7.0.0-28-generic
+Swift 3 audio was originally tested on ...
+Capability checks will determine whether the fix still works.
 ```
+
+Це повідомлення не блокує виконання. Далі роль перевіряє фактичний driver,
+firmware, DMIC card, UCM, mixer і PipeWire source.
 
 ### Фаза E — legacy driver override cleanup
 
@@ -813,7 +848,8 @@ alsaucm -c "hw:$N" set _verb HiFi
 amixer -c "$N" cget name='DMIC Volume'
 ```
 
-Якщо `values=0`, ставить maximum integer і зберігає state.
+Якщо `values=0`, ставить maximum integer і зберігає state. Після корекції роль
+повторно читає control і зупиняється, якщо `DMIC Volume` усе ще нульовий.
 
 ### Фаза L — PipeWire runtime helper
 
@@ -827,7 +863,7 @@ Helper:
 
 - до 30 секунд чекає `pactl info`;
 - шукає actual PipeWire card за prefix;
-- якщо API/card/source не доступні, повертає `ANSIBLE_DEFERRED`, а не падає;
+- якщо API/card/source не доступні, повертає `ANSIBLE_DEFERRED`;
 - перемикає profile на `pro-audio`;
 - шукає preferred або fallback AVS DMIC source;
 - робить source default;
@@ -861,7 +897,12 @@ Helper:
 
 - restart-ить WirePlumber/PipeWire після UCM або mixer changes;
 - робить `systemctl --user daemon-reload`;
-- запускає runtime helper.
+- запускає runtime helper;
+- вважає `ANSIBLE_DEFERRED` невдалим capability check;
+- повторно читає sources і вимагає `alsa_input.platform-avs_dmic...`.
+
+Якщо активної user session немає, live PipeWire checks відкладаються, а
+persistent user service застосує конфігурацію при наступному login.
 
 Усі user-команди виконуються з:
 
@@ -885,9 +926,14 @@ DBUS_SESSION_BUS_ADDRESS = unix:path=/run/user/${UID}/bus
 - повторно змінювати правильний PipeWire profile;
 - повторно змінювати правильний default source.
 
-### 12.2. Exact version lock навмисно суворий
+### 12.2. Exact version lock суворий лише для вибраних audio dependencies
 
-Будь-який drift зупиняє роль до аудіозмін. Це відповідає вимозі користувача: не застосовувати неперевірений hardware fix після оновлення залежностей.
+Drift пакетів зі `swift3_audio_tested_packages` зупиняє роль до аудіозмін. Це
+стосується firmware, UCM і PipeWire/WirePlumber stack, зміни в якому можуть
+змінити topology files, UCM lookup, profile або source names.
+
+Kernel version до цього lock не входить. Для ядра вирішальними є capability
+checks і короткий тест запису після reboot.
 
 ### 12.3. BIOS version теж суворо зафіксована
 
@@ -956,166 +1002,45 @@ swift3_audio_disabled_overrides
 
 ---
 
-## 13. Обов’язковий workflow після оновлення пакетів або ядра
+## 13. Workflow після оновлення
 
-### Крок 1 — нічого не «виправляти» наосліп
+### 13.1. Після оновлення лише ядра
 
-Не починати з:
+1. Перевірити `uname -r`; reboot потрібен лише щоб завантажити нововстановлене ядро.
+2. Виконати короткі capability checks із розділу 1.
+3. Запустити `install.sh`.
+4. Якщо Ansible явно попросив reboot через driver/firmware change, перезавантажитися і повторити запуск.
+5. Зробити п’ятисекундний запис через `pw-record` і прослухати його.
 
-```yaml
-swift3_audio_enforce_tested_stack: false
-```
+Якщо `snd_soc_avs`, DMIC card, `HiFi`, ненульовий mixer і PipeWire source на
+місці, kernel update приймається без зміни ролі або pins. Повідомлення про
+відмінну версію ядра є інформаційним.
 
-і не запускати всю роль на неперевіреному стеку.
+### 13.2. Після оновлення pinned audio package
 
-Спочатку лише діагностика.
+Якщо змінився пакет зі `swift3_audio_tested_packages`, exact lock зупинить роль.
+Тоді потрібно:
 
-### Крок 2 — зафіксувати Git і систему
+1. Зафіксувати встановлену версію пакета і поточний Git commit.
+2. Перевірити changelog, Ubuntu file list та релевантні upstream issues.
+3. Виконати capability checks і acceptance matrix з цього документа.
+4. Якщо роль попросила reboot через boot-critical change, перевірити звук після reboot і повторного login.
+5. Оновити pin лише після успішного тесту фактично встановленої версії.
 
-```bash
-git -C /path/to/dotfiles status
-git -C /path/to/dotfiles rev-parse HEAD
-git -C /path/to/dotfiles log -1 --oneline
+Не вимикати `swift3_audio_enforce_tested_stack` назавжди і не переносити в lock
+значення `apt-cache Candidate`, яке ще не встановлене та не протестоване.
 
-date --iso-8601=seconds
-uname -a
-cat /etc/os-release
-```
-
-### Крок 3 — зняти package versions
-
-```bash
-packages=(
-  linux-image-generic
-  linux-firmware
-  linux-firmware-intel-misc
-  alsa-ucm-conf
-  libasound2t64
-  libasound2-data
-  alsa-utils
-  pipewire
-  pipewire-pulse
-  wireplumber
-  pulseaudio-utils
-)
-
-for p in "${packages[@]}"; do
-  installed="$(dpkg-query -W -f='${Version}' "$p" 2>/dev/null || echo MISSING)"
-  candidate="$(apt-cache policy "$p" | awk '/Candidate:/ {print $2; exit}')"
-  printf '%-32s installed=%-32s candidate=%s\n' \
-    "$p" "$installed" "${candidate:-NONE}"
-done
-```
-
-### Крок 4 — перевірити booted kernel окремо
+Для розширеної діагностики user session корисні:
 
 ```bash
-uname -r
-dpkg-query -W -f='${Version}\n' linux-image-generic
-```
-
-Не плутати installed metapackage і running kernel.
-
-### Крок 5 — перевірити DMI та PCI
-
-```bash
-cat /sys/class/dmi/id/sys_vendor
-cat /sys/class/dmi/id/product_name
-cat /sys/class/dmi/id/product_version
-cat /sys/class/dmi/id/board_name
-cat /sys/class/dmi/id/bios_version
-
-lspci -Dnnk
-```
-
-Очікувати:
-
-```text
-8086:9d71
-1025:1272
-Kernel driver in use: snd_soc_avs
-```
-
-### Крок 6 — перевірити local overrides
-
-```bash
-grep -RniE \
-  'snd-intel-dspcfg|dsp_driver|snd_hda_intel' \
-  /etc/modprobe.d || true
-```
-
-### Крок 7 — перевірити firmware ownership
-
-```bash
-for f in \
-  dmic-tplg.bin.zst \
-  hda-generic-1ep-tplg.bin.zst \
-  hda-generic-tplg.bin.zst \
-  hda-808628xx-3ep-tplg.bin.zst \
-  hda-8086-generic-tplg.bin.zst
-do
-  path="/usr/lib/firmware/intel/avs/$f"
-  ls -l "$path"
-  readlink -f "$path"
-  dpkg-query -S "$path" || true
-done
-```
-
-### Крок 8 — динамічно знайти DMIC
-
-```bash
-for card in /sys/class/sound/card[0-9]*; do
-  [ -r "$card/id" ] || continue
-  printf '%s id=%s\n' "$(basename "$card")" "$(cat "$card/id")"
-done
-
-cat /proc/asound/cards
-arecord -l
-```
-
-### Крок 9 — перевірити UCM
-
-```bash
-DMIC_CARD="$(
-  for card in /sys/class/sound/card[0-9]*; do
-    [ -r "$card/id" ] || continue
-    [ "$(cat "$card/id")" = DMIC ] || continue
-    basename "$card" | sed 's/^card//'
-    break
-  done
-)"
-
-alsaucm -c "hw:$DMIC_CARD" list _verbs
-```
-
-### Крок 10 — перевірити mixer
-
-```bash
-amixer -c "$DMIC_CARD" cget name='DMIC Volume'
-```
-
-### Крок 11 — перевірити PipeWire
-
-Від імені desktop user:
-
-```bash
-systemctl --user is-active pipewire
-systemctl --user is-active pipewire-pulse
-systemctl --user is-active wireplumber
-
+systemctl --user is-active pipewire pipewire-pulse wireplumber
 pactl info
 pactl list short cards
 pactl list short sources
-pactl list cards
 ```
 
-Якщо `pactl` відсутній:
-
-```bash
-sudo apt install pulseaudio-utils
-```
-
-Це не означає, що PulseAudio server замінює PipeWire. `pactl` працює через PipeWire PulseAudio compatibility service.
+`pactl` тут працює через PipeWire PulseAudio compatibility service; це не означає,
+що система повернулася на PulseAudio server.
 
 ---
 
@@ -1368,7 +1293,8 @@ pw-play /tmp/swift3-pw-dmic.wav
 - [ ] Перший запуск робить лише необхідні зміни.
 - [ ] Другий запуск не робить повторних змін.
 - [ ] Без `swift3_audio_reboot=true` автоматичного reboot немає.
-- [ ] Version drift зупиняє роль до hardware modifications.
+- [ ] Kernel drift лише повідомляється і не блокує capability checks.
+- [ ] Drift pinned audio package зупиняє роль до hardware modifications.
 - [ ] Немає ручних Plucky packages на Resolute.
 
 ---
@@ -1381,7 +1307,7 @@ pw-play /tmp/swift3-pw-dmic.wav
 vars/hardware/acer-swift3-audio.yml
 ```
 
-### Оновлювати лише після повного тесту
+### Що входить до lock
 
 Поля:
 
@@ -1393,30 +1319,25 @@ swift3_audio_tested_platform:
   product_version:
   board_name:
   bios_version:
-  running_kernel:
 
 swift3_audio_tested_packages:
-  linux-image-generic:
   linux-firmware-intel-misc:
   alsa-ucm-conf:
-  libasound2t64:
-  libasound2-data:
-  alsa-utils:
   pipewire:
   pipewire-pulse:
   wireplumber:
 ```
 
+`swift3_audio_tested_platform.running_kernel` можна залишати як історичну
+довідку про первинно протестований стек. Це поле не є lock і не мусить слідувати
+за кожним kernel update.
+
 ### Версії брати лише з фактично встановлених пакетів
 
 ```bash
 dpkg-query -W -f='${Package}=${Version}\n' \
-  linux-image-generic \
   linux-firmware-intel-misc \
   alsa-ucm-conf \
-  libasound2t64 \
-  libasound2-data \
-  alsa-utils \
   pipewire \
   pipewire-pulse \
   wireplumber
@@ -1429,7 +1350,7 @@ dpkg-query -W -f='${Package}=${Version}\n' \
 Для майбутніх змін краще брати package versions у лапки:
 
 ```yaml
-linux-image-generic: "7.0.0-29.29"
+pipewire: "1.6.2-1ubuntu1.1"
 ```
 
 Це знімає неоднозначність YAML parsing.
@@ -1451,16 +1372,18 @@ linux-image-generic: "7.0.0-29.29"
 5. протестувати clean system state;
 6. оновити lock після acceptance matrix.
 
-### Role fails: untested running kernel
+### Role reports kernel version drift
 
 Перевірити:
 
 ```bash
 uname -r
-dpkg-query -W linux-image-generic
+lspci -nnk -s 00:1f.3
 ```
 
-Можливо, потрібен лише reboot у вже встановлене ядро.
+Це не failure. Якщо нове ядро ще не завантажене, виконати reboot; потім виконати
+capability checks і тест запису з розділу 1.
+Якщо вони проходять, нічого в ролі або pins змінювати не потрібно.
 
 ### Expected PCI device not found
 
@@ -1539,7 +1462,10 @@ systemctl --user status pipewire pipewire-pulse wireplumber
 
 ### PipeWire card not found одразу після restart
 
-Поточний runtime helper чекає до 30 секунд і може повернути deferred.
+Поточний runtime helper чекає до 30 секунд і може повернути deferred. Під час
+Ansible-запуску з активною user session це перетворюється на явний failed
+capability check; у persistent user service helper завершується без аварії й може
+бути запущений знову після login.
 
 Перевірити після login або запустити user service вручну:
 
@@ -1735,23 +1661,20 @@ https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/alsa.htm
 
 ## 25. Рекомендований формат роботи нового агента
 
-Коли користувач повернеться після оновлення і скаже, що роль зупинилася на version drift:
+Після звичайного kernel update не починати з редагування ролі. Потрібно:
 
-1. отримати актуальний GitHub `master`;
-2. попросити або створити read-only precheck;
-3. порівняти старий і новий stack;
-4. виконати web verification офіційних package/file lists;
-5. перевірити issue #497 і kernel issue;
-6. визначити, які workaround-и все ще реально потрібні;
-7. не змінювати роль до завершення diagnosis;
-8. зробити мінімальний patch;
-9. дати користувачу exact diff або повний файл;
-10. запустити Ansible;
-11. виконати acceptance matrix;
-12. reboot;
-13. повторити tests;
-14. запустити Ansible вдруге;
-15. лише після цього оновити tested versions і commit.
+1. Отримати актуальний GitHub `master`.
+2. Перевірити `uname -r`; якщо треба протестувати ще не завантажене нове ядро, виконати reboot.
+3. Виконати короткі capability checks і `pw-record` test із розділу 1.
+4. Запустити Ansible та перевірити, що capability checks проходять.
+5. Виконати reboot і повторний запуск лише якщо роль явно зупинилася з такою вимогою.
+6. Нічого не змінювати, якщо мікрофон працює.
+
+Розширений precheck, web verification і зміна коду потрібні лише якщо capability
+check або реальний запис не проходить, чи якщо змінився pinned audio package. У
+такому разі спочатку локалізувати несправний рівень: driver, firmware, UCM,
+mixer або PipeWire. Version pin оновлювати тільки для фактично протестованої
+версії відповідного audio package; kernel version не pin-ити.
 
 ---
 
@@ -1808,13 +1731,14 @@ DMIC Volume = 0
 
 Поточна Ansible-роль:
 
-- жорстко обмежена exact hardware/OS/version stack;
+- жорстко перевіряє exact hardware/OS і вибрані audio package versions;
+- використовує версію ядра лише як інформаційну tested baseline;
 - використовує capability checks;
 - динамічно знаходить DMIC;
 - створює mapping тільки коли UCM не працює;
 - змінює mixer тільки коли він zero;
 - застосовує PipeWire runtime config у user session;
 - не reboot-ить без окремої змінної;
-- зупиняється на неперевіреному stack drift.
+- зупиняється на drift pinned audio dependencies, але не через kernel drift.
 
 Це і є базова архітектура, яку треба зберегти під час майбутніх оновлень.

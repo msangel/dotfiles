@@ -93,16 +93,16 @@
     label: "{{ item.key }}"
   when: swift3_audio_enforce_tested_stack | bool
 
-- name: Verify tested running kernel
-  ansible.builtin.assert:
-    that:
-      - ansible_kernel == swift3_audio_tested_platform.running_kernel
-    fail_msg: >-
-      Untested running kernel.
-      Expected={{ swift3_audio_tested_platform.running_kernel }},
-      actual={{ ansible_kernel }}.
-      Regenerate or review the Swift 3 audio role before continuing.
-  when: swift3_audio_enforce_tested_stack | bool
+- name: Report kernel version drift
+  ansible.builtin.debug:
+    msg: >-
+      Swift 3 audio was originally tested on
+      {{ swift3_audio_tested_platform.running_kernel }},
+      current kernel is {{ ansible_facts["kernel"] }}.
+      Capability checks will determine whether the fix still works.
+  when: >-
+    ansible_facts["kernel"]
+    != swift3_audio_tested_platform.running_kernel
 
 - name: Find forced legacy Intel DSP driver overrides
   ansible.builtin.shell: |
@@ -484,6 +484,29 @@
           - "{{ swift3_audio_dmic_card_number }}"
       when: swift3_audio_mixer_changed.changed | default(false)
 
+    - name: Read corrected DMIC mixer volume
+      ansible.builtin.command:
+        argv:
+          - amixer
+          - -c
+          - "{{ swift3_audio_dmic_card_number }}"
+          - cget
+          - "name=DMIC Volume"
+      register: swift3_audio_mixer_after
+      changed_when: false
+
+    - name: Verify non-zero DMIC mixer volume
+      ansible.builtin.assert:
+        that:
+          - >-
+            (
+              swift3_audio_mixer_after.stdout
+              | regex_search('(?m)^[ \t]*: values=0(?:,0)*[ \t]*$')
+            ) is none
+        fail_msg: >-
+          DMIC Volume is still zero after applying the mixer correction.
+          Output: {{ swift3_audio_mixer_after.stdout }}
+
     - name: Create target user local binary directory
       ansible.builtin.file:
         path: "{{ target_home }}/.local/bin"
@@ -730,12 +753,41 @@
       changed_when: "'ANSIBLE_CHANGED' in swift3_audio_runtime_result.stdout"
       when: swift3_audio_user_bus.stat.exists
 
-    - name: Report deferred PipeWire runtime configuration
-      ansible.builtin.debug:
-        msg: "{{ swift3_audio_runtime_result.stdout }}"
-      when:
-        - swift3_audio_user_bus.stat.exists
-        - "'ANSIBLE_DEFERRED' in swift3_audio_runtime_result.stdout"
+    - name: Verify PipeWire runtime configuration was applied
+      ansible.builtin.assert:
+        that:
+          - "'ANSIBLE_DEFERRED' not in swift3_audio_runtime_result.stdout"
+        fail_msg: "{{ swift3_audio_runtime_result.stdout }}"
+      when: swift3_audio_user_bus.stat.exists
+
+    - name: Read PipeWire sources
+      ansible.builtin.command:
+        argv:
+          - pactl
+          - list
+          - short
+          - sources
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+        XDG_RUNTIME_DIR: "/run/user/{{ target_uid_result.stdout }}"
+        DBUS_SESSION_BUS_ADDRESS: >-
+          unix:path=/run/user/{{ target_uid_result.stdout }}/bus
+      register: swift3_audio_pipewire_sources
+      changed_when: false
+      when: swift3_audio_user_bus.stat.exists
+
+    - name: Verify AVS DMIC PipeWire source
+      ansible.builtin.assert:
+        that:
+          - >-
+            'alsa_input.platform-avs_dmic.'
+            in swift3_audio_pipewire_sources.stdout
+        fail_msg: >-
+          PipeWire did not create an AVS DMIC source.
+          Sources: {{ swift3_audio_pipewire_sources.stdout }}
+      when: swift3_audio_user_bus.stat.exists
 
     - name: Report deferred PipeWire configuration
       ansible.builtin.debug:
