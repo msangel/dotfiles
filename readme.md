@@ -37,14 +37,3 @@ docker run --rm -it \
   '
 ```
 
-
-# hardware
-* https://laptopmedia.com/laptop-specs/acer-swift-3-sf315-52-10/
-  * linux mic problem:
-    * main discussion: https://bugzilla.kernel.org/show_bug.cgi?id=201251
-    * on alsa page: https://bugs.launchpad.net/ubuntu/+source/alsa-driver/+bug/1793410
-    * retasker: https://www.omgubuntu.co.uk/2013/12/turn-headphone-jack-microphone-jack-ubuntu
-    * ru forum: https://4pda.ru/forum/index.php?showtopic=910434
-    * working solution: https://kdi.net.ua/mini-usb-mikrofon-dlya-noutbuka/
-
-service: http://team.ua/team-service-centre/warranty/brands/
