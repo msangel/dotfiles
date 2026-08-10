@@ -1,0 +1,268 @@
+---
+- name: Detect root filesystem
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -no
+      - FSTYPE,UUID
+      - /
+  register: swift3_hibernate_root_fs
+  changed_when: false
+
+- name: Parse root filesystem facts
+  ansible.builtin.set_fact:
+    swift3_hibernate_root_fstype: "{{ swift3_hibernate_root_fs.stdout.split()[0] }}"
+    swift3_hibernate_root_uuid: "{{ swift3_hibernate_root_fs.stdout.split()[1] }}"
+
+- name: Verify supported root filesystem
+  ansible.builtin.assert:
+    that:
+      - swift3_hibernate_root_fstype == 'ext4'
+      - swift3_hibernate_root_uuid | length > 0
+    fail_msg: >-
+      Hibernate setup currently supports an ext4 root filesystem only.
+      Detected filesystem={{ swift3_hibernate_root_fstype }},
+      UUID={{ swift3_hibernate_root_uuid | default('missing') }}.
+
+- name: Inspect swap file
+  ansible.builtin.stat:
+    path: "{{ swift3_hibernate_swapfile }}"
+  register: swift3_hibernate_swapfile_stat
+
+- name: Check whether swap file is active
+  become: true
+  ansible.builtin.shell: |
+    swapon --noheadings --show=NAME | grep --fixed-strings --line-regexp -- {{ swift3_hibernate_swapfile | quote }}
+  args:
+    executable: /bin/bash
+  register: swift3_hibernate_swap_active
+  changed_when: false
+  failed_when: false
+
+- name: Disable undersized swap file
+  become: true
+  ansible.builtin.command:
+    argv:
+      - swapoff
+      - "{{ swift3_hibernate_swapfile }}"
+  when:
+    - swift3_hibernate_swap_active.rc == 0
+    - not swift3_hibernate_swapfile_stat.stat.exists or
+      (swift3_hibernate_swapfile_stat.stat.size | int) < (swift3_hibernate_swap_size_gib | int * 1024 * 1024 * 1024)
+
+- name: Remove undersized swap file
+  become: true
+  ansible.builtin.file:
+    path: "{{ swift3_hibernate_swapfile }}"
+    state: absent
+  when: >-
+    not swift3_hibernate_swapfile_stat.stat.exists or
+    (swift3_hibernate_swapfile_stat.stat.size | int)
+    < (swift3_hibernate_swap_size_gib | int * 1024 * 1024 * 1024)
+
+- name: Allocate hibernation swap file
+  become: true
+  ansible.builtin.command:
+    argv:
+      - fallocate
+      - -l
+      - "{{ swift3_hibernate_swap_size_gib }}G"
+      - "{{ swift3_hibernate_swapfile }}"
+  args:
+    creates: "{{ swift3_hibernate_swapfile }}"
+  register: swift3_hibernate_swap_allocated
+
+- name: Set swap file permissions
+  become: true
+  ansible.builtin.file:
+    path: "{{ swift3_hibernate_swapfile }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Initialize new swap file
+  become: true
+  ansible.builtin.command:
+    argv:
+      - mkswap
+      - "{{ swift3_hibernate_swapfile }}"
+  when: swift3_hibernate_swap_allocated.changed
+
+- name: Persist swap file in fstab
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ swift3_hibernate_swapfile | regex_escape }}\\s+"
+    line: "{{ swift3_hibernate_swapfile }} none swap sw 0 0"
+    state: present
+
+- name: Enable swap file
+  become: true
+  ansible.builtin.command:
+    argv:
+      - swapon
+      - "{{ swift3_hibernate_swapfile }}"
+  when: swift3_hibernate_swap_active.rc != 0 or swift3_hibernate_swap_allocated.changed
+
+- name: Read system page size
+  ansible.builtin.command:
+    argv:
+      - getconf
+      - PAGESIZE
+  register: swift3_hibernate_page_size
+  changed_when: false
+
+- name: Calculate swap file resume offset
+  become: true
+  ansible.builtin.shell: |
+    set -euo pipefail
+    filefrag -b{{ swift3_hibernate_page_size.stdout | trim }} -v {{ swift3_hibernate_swapfile | quote }} \
+      | awk '$1 == "0:" {gsub(/\\.\\./, "", $4); sub(/\\.$/, "", $4); print $4; exit}'
+  args:
+    executable: /bin/bash
+  register: swift3_hibernate_resume_offset
+  changed_when: false
+
+- name: Verify resume offset
+  ansible.builtin.assert:
+    that:
+      - swift3_hibernate_resume_offset.stdout is match('^[0-9]+$')
+    fail_msg: >-
+      Could not determine resume_offset for {{ swift3_hibernate_swapfile }}.
+      filefrag output parsing returned '{{ swift3_hibernate_resume_offset.stdout }}'.
+
+- name: Configure initramfs resume
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/initramfs-tools/conf.d/resume
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      RESUME=UUID={{ swift3_hibernate_root_uuid }}
+      resume_offset={{ swift3_hibernate_resume_offset.stdout }}
+  register: swift3_hibernate_initramfs_resume
+
+- name: Read current GRUB kernel command line
+  become: true
+  ansible.builtin.shell: |
+    sed -n 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"$/\1/p' /etc/default/grub | head -n1
+  args:
+    executable: /bin/bash
+  register: swift3_hibernate_grub_cmdline
+  changed_when: false
+
+- name: Build GRUB kernel command line
+  ansible.builtin.set_fact:
+    swift3_hibernate_grub_cmdline_new: >-
+      {{
+        (
+          swift3_hibernate_grub_cmdline.stdout
+          | regex_replace('(^|\\s)resume=[^\\s]+', '')
+          | regex_replace('(^|\\s)resume_offset=[^\\s]+', '')
+          | regex_replace('\\s+', ' ')
+          | trim
+          ~ ' resume=UUID=' ~ swift3_hibernate_root_uuid
+          ~ ' resume_offset=' ~ swift3_hibernate_resume_offset.stdout
+        ) | trim
+      }}
+
+- name: Configure GRUB resume parameters
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="{{ swift3_hibernate_grub_cmdline_new }}"'
+  register: swift3_hibernate_grub_config
+
+- name: Install wakeup-source policy script
+  become: true
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/disable-wakeups-except-power-button.sh
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/bin/sh
+
+      for d in /sys/class/wakeup/*; do
+        name=$(cat "$d/name" 2>/dev/null)
+        f="$d/device/power/wakeup"
+
+        [ -f "$f" ] || continue
+
+        if [ "$name" = "PNP0C0C:00" ] || [ "$name" = "PBTN" ]; then
+          echo enabled > "$f" 2>/dev/null || true
+        else
+          echo disabled > "$f" 2>/dev/null || true
+        fi
+      done
+
+      exit 0
+  register: swift3_hibernate_wakeup_script
+
+- name: Install wakeup-source systemd service
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/disable-wakeups-except-power-button.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Disable all wakeup sources except power button
+      After=multi-user.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/disable-wakeups-except-power-button.sh
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+  register: swift3_hibernate_wakeup_service
+
+- name: Reload systemd after wakeup policy changes
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: swift3_hibernate_wakeup_service.changed
+
+- name: Enable wakeup-source policy
+  become: true
+  ansible.builtin.systemd:
+    name: disable-wakeups-except-power-button.service
+    enabled: true
+    state: started
+
+- name: Reapply wakeup-source policy after script changes
+  become: true
+  ansible.builtin.systemd:
+    name: disable-wakeups-except-power-button.service
+    state: restarted
+  when: swift3_hibernate_wakeup_script.changed
+
+- name: Rebuild initramfs
+  become: true
+  ansible.builtin.command:
+    argv:
+      - update-initramfs
+      - -u
+  when: >-
+    swift3_hibernate_swap_allocated.changed or
+    swift3_hibernate_initramfs_resume.changed
+
+- name: Regenerate GRUB configuration
+  become: true
+  ansible.builtin.command:
+    argv:
+      - update-grub
+  when: swift3_hibernate_grub_config.changed
+
+- name: Report hibernate configuration
+  ansible.builtin.debug:
+    msg:
+      - "Hibernate configured with swap={{ swift3_hibernate_swapfile }} ({{ swift3_hibernate_swap_size_gib }} GiB)"
+      - "resume UUID={{ swift3_hibernate_root_uuid }}"
+      - "resume_offset={{ swift3_hibernate_resume_offset.stdout }}"
+      - "Reboot manually, then test with: sudo systemctl hibernate"
