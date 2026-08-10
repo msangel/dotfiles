@@ -1,0 +1,13 @@
+---
+- name: Configure unlimited Bash history
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.bashrc"
+    create: true
+    owner: "{{ target_user }}"
+    group: "{{ target_group }}"
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED BASH HISTORY"
+    block: |
+      export HISTSIZE=-1
+      export HISTFILESIZE=-1
+      shopt -s histappend
