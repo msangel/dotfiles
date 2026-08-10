@@ -48,7 +48,7 @@
   when:
     - swift3_hibernate_swap_active.rc == 0
     - not swift3_hibernate_swapfile_stat.stat.exists or
-      (swift3_hibernate_swapfile_stat.stat.size | int) < (swift3_hibernate_swap_size_gib | int * 1024 * 1024 * 1024)
+      (swift3_hibernate_swapfile_stat.stat.size | int) < ((swift3_hibernate_swap_size_gib | int) * 1024 * 1024 * 1024)
 
 - name: Remove undersized swap file
   become: true
@@ -58,7 +58,7 @@
   when: >-
     not swift3_hibernate_swapfile_stat.stat.exists or
     (swift3_hibernate_swapfile_stat.stat.size | int)
-    < (swift3_hibernate_swap_size_gib | int * 1024 * 1024 * 1024)
+    < ((swift3_hibernate_swap_size_gib | int) * 1024 * 1024 * 1024)
 
 - name: Allocate hibernation swap file
   become: true
@@ -117,7 +117,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     filefrag -b{{ swift3_hibernate_page_size.stdout | trim }} -v {{ swift3_hibernate_swapfile | quote }} \
-      | awk '$1 == "0:" {gsub(/\\.\\./, "", $4); sub(/\\.$/, "", $4); print $4; exit}'
+      | awk '$1 == "0:" {sub(/\\.\\..*/, "", $4); print $4; exit}'
   args:
     executable: /bin/bash
   register: swift3_hibernate_resume_offset
