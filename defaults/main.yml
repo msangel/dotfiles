@@ -34,6 +34,10 @@ swift3_audio_enabled: true
 swift3_audio_enforce_tested_stack: true
 swift3_audio_reboot: false
 
+swift3_hibernate_enabled: true
+swift3_hibernate_swapfile: /swap.img
+swift3_hibernate_swap_size_gib: 36
+
 xfce_settings:
     - channel: xsettings
       property: /Net/ThemeName
