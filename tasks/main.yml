@@ -44,6 +44,9 @@
 - name: Install postman
   import_tasks: 14.postman.yml
 
+- name: Configure unlimited Bash history
+  import_tasks: 15.bash-history.yml
+
 - name: Configure Acer Swift 3
   ansible.builtin.import_tasks: hardware/acer-swift3.yml
   when: is_swift3
