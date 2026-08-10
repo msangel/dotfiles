@@ -79,4 +79,9 @@ xfce_settings:
       property: /Xfce/LastCustomDPI
       value: "{{ xfce_custom_dpi }}"
       type: int
+
+    - channel: xfwm4
+      property: /general/button_layout
+      value: "O|HMC"
+      type: string
   
