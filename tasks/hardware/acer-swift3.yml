@@ -4,5 +4,5 @@
   when: swift3_audio_enabled | bool
 
 - name: Configure Swift 3 hibernate
-  ansible.builtin.import_tasks: acer-swift3/hibernate.yml
+  ansible.builtin.import_tasks: acer-swift3/hibernate-dracut.yml
   when: swift3_hibernate_enabled | bool
