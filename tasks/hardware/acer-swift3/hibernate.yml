@@ -107,7 +107,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     lsblk -s -r -n -o TYPE,UUID {{ swift3_hibernate_root_source | quote }} \
-      | awk '$1 == "part" && $2 != "" {print $2; exit}'
+      | awk '$1 == "part" && $2 != "" && !found {print $2; found=1}'
   args:
     executable: /bin/bash
   register: swift3_hibernate_luks_uuid
@@ -117,7 +117,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     grep --fixed-strings -- {{ swift3_hibernate_luks_uuid.stdout | trim | quote }} /etc/crypttab \
-      | grep -qE '(^|[[:space:]])luks([,[:space:]]|$)'
+      | grep -E '(^|[[:space:]])luks([,[:space:]]|$)' >/dev/null
   args:
     executable: /bin/bash
   changed_when: false
@@ -248,7 +248,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     filefrag -b{{ swift3_hibernate_page_size.stdout | trim }} -v {{ swift3_hibernate_swapfile | quote }} \
-      | awk '$1 == "0:" {sub(/\.\..*/, "", $4); print $4; exit}'
+      | awk '$1 == "0:" && !found {sub(/\.\..*/, "", $4); print $4; found=1}'
   args:
     executable: /bin/bash
   register: swift3_hibernate_resume_offset
@@ -460,7 +460,7 @@
 - name: Detect highest installed kernel
   ansible.builtin.shell: |
     set -euo pipefail
-    linux-version list | linux-version sort --reverse | head -n1
+    linux-version list | linux-version sort --reverse | sed -n '1p'
   args:
     executable: /bin/bash
   register: swift3_hibernate_target_kernel
