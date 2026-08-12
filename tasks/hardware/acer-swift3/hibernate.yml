@@ -11,6 +11,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     for command_name in \
+      busctl \
       cryptsetup \
       dracut \
       fallocate \
@@ -310,6 +311,48 @@
       [Sleep]
       AllowHibernation=yes
 
+- name: Ensure polkit rules directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/polkit-1/rules.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Allow hibernation for active local desktop users
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/polkit-1/rules.d/00-swift3-enable-hibernate.rules
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      polkit.addRule(function(action, subject) {
+          if ((action.id == "org.freedesktop.upower.hibernate" ||
+               action.id == "org.freedesktop.login1.hibernate" ||
+               action.id == "org.freedesktop.login1.handle-hibernate-key" ||
+               action.id == "org.freedesktop.login1.hibernate-multiple-sessions") &&
+              subject.local && subject.active) {
+              return polkit.Result.YES;
+          }
+      });
+
+- name: Verify desktop user can hibernate through logind
+  ansible.builtin.command:
+    argv:
+      - busctl
+      - call
+      - org.freedesktop.login1
+      - /org/freedesktop/login1
+      - org.freedesktop.login1.Manager
+      - CanHibernate
+  register: swift3_hibernate_can_hibernate
+  changed_when: false
+  until: '"yes" in swift3_hibernate_can_hibernate.stdout'
+  retries: 5
+  delay: 1
+
 - name: Read GRUB_CMDLINE_LINUX
   ansible.builtin.shell: |
     sed -n 's/^GRUB_CMDLINE_LINUX="\([^"]*\)"$/\1/p' /etc/default/grub | head -n1
@@ -537,4 +580,5 @@
       - "resume UUID={{ swift3_hibernate_resume_uuid }}"
       - "resume_offset={{ swift3_hibernate_resume_offset.stdout | trim }}"
       - "initramfs kernel={{ swift3_hibernate_target_kernel.stdout | trim }}"
+      - "desktop CanHibernate={{ swift3_hibernate_can_hibernate.stdout }}"
       - "Reboot manually, then test with: sudo systemctl hibernate"
