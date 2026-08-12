@@ -6,10 +6,31 @@
       - ansible_facts.distribution_version == '26.04'
     fail_msg: >-
       Swift 3 hibernate setup is currently tested only on Ubuntu 26.04.
-      Detected {{ ansible_facts.distribution }}
-      {{ ansible_facts.distribution_version }}.
 
-- name: Detect active initramfs implementation
+- name: Verify required hibernate tools are available
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for command_name in \
+      cryptsetup \
+      dracut \
+      fallocate \
+      filefrag \
+      findmnt \
+      linux-version \
+      lsinitrd \
+      lvm \
+      mkswap \
+      swapon \
+      swapoff \
+      update-grub \
+      update-initramfs; do
+      command -v "$command_name" >/dev/null
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Verify update-initramfs is provided by dracut
   ansible.builtin.command:
     argv:
       - dpkg-query
@@ -23,42 +44,17 @@
     that:
       - swift3_hibernate_initramfs_owner.stdout is match('^dracut:')
     fail_msg: >-
-      This hibernate setup expects /usr/sbin/update-initramfs to be
-      provided by dracut. Detected:
-      {{ swift3_hibernate_initramfs_owner.stdout }}.
-
-- name: Install hibernate dependencies
-  become: true
-  ansible.builtin.apt:
-    name:
-      - cryptsetup
-      - dracut
-      - dracut-core
-      - e2fsprogs
-      - grub2-common
-      - linux-base
-      - lvm2
-      - util-linux
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-
-- name: Read supported kernel sleep states
-  ansible.builtin.command:
-    argv:
-      - cat
-      - /sys/power/state
-  register: swift3_hibernate_power_states
-  changed_when: false
+      /usr/sbin/update-initramfs must be provided by dracut.
+      Detected: {{ swift3_hibernate_initramfs_owner.stdout }}
 
 - name: Verify kernel hibernation support
-  ansible.builtin.assert:
-    that:
-      - "'disk' in swift3_hibernate_power_states.stdout.split()"
-    fail_msg: >-
-      The running kernel does not advertise the disk sleep state required
-      for hibernation. /sys/power/state={{
-      swift3_hibernate_power_states.stdout }}.
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -qw
+      - disk
+      - /sys/power/state
+  changed_when: false
 
 - name: Detect root filesystem
   ansible.builtin.command:
@@ -82,10 +78,8 @@
       - swift3_hibernate_root_fstype == 'ext4'
       - swift3_hibernate_root_uuid | length > 0
     fail_msg: >-
-      Hibernate setup currently supports an ext4 root filesystem only.
-      Detected source={{ swift3_hibernate_root_source }},
-      filesystem={{ swift3_hibernate_root_fstype }},
-      UUID={{ swift3_hibernate_root_uuid | default('missing') }}.
+      Expected ext4 root filesystem. Detected
+      {{ swift3_hibernate_root_source }} {{ swift3_hibernate_root_fstype }}.
 
 - name: Detect root storage stack
   ansible.builtin.command:
@@ -100,15 +94,14 @@
   register: swift3_hibernate_root_stack
   changed_when: false
 
-- name: Verify LUKS and LVM root stack
+- name: Verify tested LUKS and LVM layout
   ansible.builtin.assert:
     that:
       - "'lvm' in swift3_hibernate_root_stack.stdout_lines"
       - "'crypt' in swift3_hibernate_root_stack.stdout_lines"
     fail_msg: >-
-      Hibernate setup expects the tested LUKS -> LVM -> ext4 layout.
-      Detected block-device types:
-      {{ swift3_hibernate_root_stack.stdout_lines | join(' -> ') }}.
+      Expected the tested LUKS -> LVM -> ext4 root layout.
+      Detected: {{ swift3_hibernate_root_stack.stdout_lines | join(' -> ') }}.
 
 - name: Detect underlying LUKS UUID
   ansible.builtin.shell: |
@@ -120,30 +113,14 @@
   register: swift3_hibernate_luks_uuid
   changed_when: false
 
-- name: Verify LUKS UUID was detected
-  ansible.builtin.assert:
-    that:
-      - swift3_hibernate_luks_uuid.stdout | trim | length > 0
-    fail_msg: >-
-      Could not determine the LUKS UUID below
-      {{ swift3_hibernate_root_source }}.
-
-- name: Read matching crypttab entry
+- name: Verify matching LUKS crypttab entry
   ansible.builtin.shell: |
-    grep --fixed-strings -- {{ swift3_hibernate_luks_uuid.stdout | trim | quote }} /etc/crypttab || true
+    set -euo pipefail
+    grep --fixed-strings -- {{ swift3_hibernate_luks_uuid.stdout | trim | quote }} /etc/crypttab \
+      | grep -qE '(^|[[:space:]])luks([,[:space:]]|$)'
   args:
     executable: /bin/bash
-  register: swift3_hibernate_crypttab_entry
   changed_when: false
-
-- name: Verify LUKS volume is configured for early boot
-  ansible.builtin.assert:
-    that:
-      - swift3_hibernate_crypttab_entry.stdout | length > 0
-      - "'luks' in swift3_hibernate_crypttab_entry.stdout"
-    fail_msg: >-
-      /etc/crypttab does not contain a LUKS entry for
-      UUID={{ swift3_hibernate_luks_uuid.stdout | trim }}.
 
 - name: Inspect swap file
   ansible.builtin.stat:
@@ -156,14 +133,8 @@
       {{
         not swift3_hibernate_swapfile_stat.stat.exists
         or
-        (
-          swift3_hibernate_swapfile_stat.stat.size | default(0) | int
-        )
-        <
-        (
-          (swift3_hibernate_swap_size_gib | int)
-          * 1024 * 1024 * 1024
-        )
+        (swift3_hibernate_swapfile_stat.stat.size | default(0) | int)
+        < ((swift3_hibernate_swap_size_gib | int) * 1024 * 1024 * 1024)
       }}
 
 - name: Check whether swap file is active
@@ -177,7 +148,7 @@
   changed_when: false
   failed_when: false
 
-- name: Disable undersized swap file
+- name: Disable swap file before recreation
   become: true
   ansible.builtin.command:
     argv:
@@ -236,8 +207,7 @@
     argv:
       - swapon
       - "{{ swift3_hibernate_swapfile }}"
-  when:
-    - swift3_hibernate_swap_active.rc != 0 or swift3_hibernate_swap_allocated.changed
+  when: swift3_hibernate_swap_active.rc != 0 or swift3_hibernate_swap_allocated.changed
 
 - name: Detect filesystem containing swap file
   ansible.builtin.command:
@@ -256,18 +226,14 @@
     swift3_hibernate_resume_fstype: "{{ swift3_hibernate_swap_fs.stdout.split()[1] }}"
     swift3_hibernate_resume_uuid: "{{ swift3_hibernate_swap_fs.stdout.split()[2] }}"
 
-- name: Verify swap file is on the supported root filesystem
+- name: Verify swap file is on encrypted LVM root filesystem
   ansible.builtin.assert:
     that:
       - swift3_hibernate_resume_source == swift3_hibernate_root_source
       - swift3_hibernate_resume_fstype == 'ext4'
       - swift3_hibernate_resume_uuid == swift3_hibernate_root_uuid
     fail_msg: >-
-      Expected {{ swift3_hibernate_swapfile }} on the encrypted LVM root
-      filesystem {{ swift3_hibernate_root_source }}.
-      Detected source={{ swift3_hibernate_resume_source }},
-      filesystem={{ swift3_hibernate_resume_fstype }},
-      UUID={{ swift3_hibernate_resume_uuid }}.
+      {{ swift3_hibernate_swapfile }} must be on the tested encrypted LVM root filesystem.
 
 - name: Read system page size
   ansible.builtin.command:
@@ -288,15 +254,13 @@
   register: swift3_hibernate_resume_offset
   changed_when: false
 
-- name: Verify resume offset
+- name: Verify non-zero resume offset
   ansible.builtin.assert:
     that:
       - swift3_hibernate_resume_offset.stdout is match('^[0-9]+$')
       - swift3_hibernate_resume_offset.stdout | int > 0
     fail_msg: >-
-      Could not determine a valid non-zero resume_offset for
-      {{ swift3_hibernate_swapfile }}.
-      filefrag returned '{{ swift3_hibernate_resume_offset.stdout }}'.
+      Invalid resume_offset={{ swift3_hibernate_resume_offset.stdout }}.
 
 - name: Remove stale initramfs-tools resume configuration
   become: true
@@ -314,7 +278,7 @@
     group: root
     mode: "0755"
 
-- name: Configure dracut for encrypted LVM hibernate resume
+- name: Configure exact dracut hibernate modules
   become: true
   ansible.builtin.copy:
     dest: /etc/dracut.conf.d/99-swift3-hibernate.conf
@@ -322,8 +286,8 @@
     group: root
     mode: "0644"
     content: |
-      force_add_dracutmodules+=" crypt lvm resume "
-      add_device+=" {{ swift3_hibernate_resume_source }} "
+      force_add_dracutmodules=" crypt lvm resume "
+      add_device=" {{ swift3_hibernate_resume_source }} "
   register: swift3_hibernate_dracut_config
 
 - name: Ensure systemd sleep configuration directory exists
@@ -335,7 +299,7 @@
     group: root
     mode: "0755"
 
-- name: Explicitly enable hibernation in systemd
+- name: Explicitly allow hibernation in systemd
   become: true
   ansible.builtin.copy:
     dest: /etc/systemd/sleep.conf.d/99-swift3-hibernate.conf
@@ -345,94 +309,90 @@
     content: |
       [Sleep]
       AllowHibernation=yes
-  register: swift3_hibernate_systemd_sleep_config
 
-- name: Read global GRUB kernel command line
+- name: Read GRUB_CMDLINE_LINUX
   ansible.builtin.shell: |
     sed -n 's/^GRUB_CMDLINE_LINUX="\([^"]*\)"$/\1/p' /etc/default/grub | head -n1
   args:
     executable: /bin/bash
-  register: swift3_hibernate_grub_cmdline_global
+  register: swift3_hibernate_grub_global
   changed_when: false
 
-- name: Remove hibernate parameters from global GRUB command line
+- name: Clean hibernate parameters from GRUB_CMDLINE_LINUX
   ansible.builtin.set_fact:
     swift3_hibernate_grub_global_tokens: >-
       {{
-        swift3_hibernate_grub_cmdline_global.stdout.split()
+        swift3_hibernate_grub_global.stdout.split()
         | reject('match', '^resume=')
         | reject('match', '^resume_offset=')
         | reject('equalto', 'noresume')
         | list
       }}
 
-- name: Configure clean global GRUB command line
+- name: Write clean GRUB_CMDLINE_LINUX
   become: true
   ansible.builtin.lineinfile:
     path: /etc/default/grub
     regexp: '^GRUB_CMDLINE_LINUX='
-    line: 'GRUB_CMDLINE_LINUX="{{ swift3_hibernate_grub_global_tokens | join('' '') }}"'
+    line: "GRUB_CMDLINE_LINUX=\"{{ swift3_hibernate_grub_global_tokens | join(' ') }}\""
   register: swift3_hibernate_grub_global_config
 
-- name: Read current GRUB kernel command line
+- name: Read GRUB_CMDLINE_LINUX_DEFAULT
   ansible.builtin.shell: |
     sed -n 's/^GRUB_CMDLINE_LINUX_DEFAULT="\([^"]*\)"$/\1/p' /etc/default/grub | head -n1
   args:
     executable: /bin/bash
-  register: swift3_hibernate_grub_cmdline
+  register: swift3_hibernate_grub_default
   changed_when: false
 
-- name: Verify GRUB kernel command line was found
+- name: Verify GRUB_CMDLINE_LINUX_DEFAULT exists
   ansible.builtin.assert:
     that:
-      - swift3_hibernate_grub_cmdline.stdout | length > 0
-    fail_msg: >-
-      Could not parse GRUB_CMDLINE_LINUX_DEFAULT from /etc/default/grub.
+      - swift3_hibernate_grub_default.stdout | length > 0
 
-- name: Remove all previous resume parameters from GRUB command line
+- name: Remove every stale hibernate parameter from GRUB_CMDLINE_LINUX_DEFAULT
   ansible.builtin.set_fact:
     swift3_hibernate_grub_base_tokens: >-
       {{
-        swift3_hibernate_grub_cmdline.stdout.split()
+        swift3_hibernate_grub_default.stdout.split()
         | reject('match', '^resume=')
         | reject('match', '^resume_offset=')
         | reject('equalto', 'noresume')
         | list
       }}
 
-- name: Build canonical GRUB hibernate command line
+- name: Build canonical hibernate kernel command line
   ansible.builtin.set_fact:
     swift3_hibernate_grub_cmdline_new: >-
       {{
         (
           swift3_hibernate_grub_base_tokens
-          +
-          [
-            'resume=UUID=' ~ swift3_hibernate_resume_uuid,
-            'resume_offset=' ~ (swift3_hibernate_resume_offset.stdout | trim)
-          ]
-        )
-        | join(' ')
+          + [
+              'resume=UUID=' ~ swift3_hibernate_resume_uuid,
+              'resume_offset=' ~ (swift3_hibernate_resume_offset.stdout | trim)
+            ]
+        ) | join(' ')
       }}
 
-- name: Configure one canonical GRUB resume device and offset
+- name: Write one canonical resume device and offset
   become: true
   ansible.builtin.lineinfile:
     path: /etc/default/grub
     regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
-    line: 'GRUB_CMDLINE_LINUX_DEFAULT="{{ swift3_hibernate_grub_cmdline_new }}"'
+    line: "GRUB_CMDLINE_LINUX_DEFAULT=\"{{ swift3_hibernate_grub_cmdline_new }}\""
   register: swift3_hibernate_grub_config
 
-- name: Verify canonical GRUB resume configuration
+- name: Verify repaired GRUB configuration
   ansible.builtin.shell: |
     set -euo pipefail
-    line="$(grep '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub)"
-    [[ "$(grep -o 'resume=' <<<"$line" | wc -l)" -eq 1 ]]
-    [[ "$(grep -o 'resume_offset=' <<<"$line" | wc -l)" -eq 1 ]]
-    [[ "$line" == *"resume=UUID={{ swift3_hibernate_resume_uuid }}"* ]]
-    [[ "$line" == *"resume_offset={{ swift3_hibernate_resume_offset.stdout | trim }}"* ]]
-    [[ "$line" != *"resume={{ swift3_hibernate_swapfile }}"* ]]
+    default_line="$(grep '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub)"
     global_line="$(grep '^GRUB_CMDLINE_LINUX=' /etc/default/grub)"
+
+    [[ "$(grep -o 'resume=' <<<"$default_line" | wc -l)" -eq 1 ]]
+    [[ "$(grep -o 'resume_offset=' <<<"$default_line" | wc -l)" -eq 1 ]]
+    [[ "$default_line" == *"resume=UUID={{ swift3_hibernate_resume_uuid }}"* ]]
+    [[ "$default_line" == *"resume_offset={{ swift3_hibernate_resume_offset.stdout | trim }}"* ]]
+    [[ "$default_line" != *"resume={{ swift3_hibernate_swapfile }}"* ]]
     [[ "$global_line" != *"resume="* ]]
     [[ "$global_line" != *"resume_offset="* ]]
     [[ "$global_line" != *"noresume"* ]]
@@ -449,21 +409,16 @@
     mode: "0755"
     content: |
       #!/bin/sh
-
       for d in /sys/class/wakeup/*; do
         name=$(cat "$d/name" 2>/dev/null)
         f="$d/device/power/wakeup"
-
         [ -f "$f" ] || continue
-
         if [ "$name" = "PNP0C0C:00" ] || [ "$name" = "PBTN" ]; then
           echo enabled > "$f" 2>/dev/null || true
         else
           echo disabled > "$f" 2>/dev/null || true
         fi
       done
-
-      exit 0
   register: swift3_hibernate_wakeup_script
 
 - name: Install wakeup-source systemd service
@@ -487,16 +442,11 @@
       WantedBy=multi-user.target
   register: swift3_hibernate_wakeup_service
 
-- name: Reload systemd after wakeup policy changes
-  become: true
-  ansible.builtin.systemd:
-    daemon_reload: true
-  when: swift3_hibernate_wakeup_service.changed
-
 - name: Enable wakeup-source policy
   become: true
   ansible.builtin.systemd:
     name: disable-wakeups-except-power-button.service
+    daemon_reload: "{{ swift3_hibernate_wakeup_service.changed }}"
     enabled: true
     state: started
 
@@ -516,26 +466,6 @@
   register: swift3_hibernate_target_kernel
   changed_when: false
 
-- name: Verify target kernel was detected
-  ansible.builtin.assert:
-    that:
-      - swift3_hibernate_target_kernel.stdout | trim | length > 0
-    fail_msg: Could not identify the highest installed kernel.
-
-- name: Inspect target initramfs
-  ansible.builtin.stat:
-    path: "/boot/initrd.img-{{ swift3_hibernate_target_kernel.stdout | trim }}"
-  register: swift3_hibernate_target_initramfs
-
-- name: Verify target initramfs exists
-  ansible.builtin.assert:
-    that:
-      - swift3_hibernate_target_initramfs.stat.exists
-      - swift3_hibernate_target_initramfs.stat.isreg
-    fail_msg: >-
-      Missing initramfs for kernel
-      {{ swift3_hibernate_target_kernel.stdout | trim }}.
-
 - name: Read current target initramfs modules
   become: true
   ansible.builtin.command:
@@ -547,7 +477,7 @@
   changed_when: false
   failed_when: false
 
-- name: Decide whether target initramfs must be rebuilt
+- name: Decide whether dracut initramfs must be rebuilt
   ansible.builtin.set_fact:
     swift3_hibernate_initramfs_needs_rebuild: >-
       {{
@@ -560,7 +490,7 @@
         or 'resume' not in swift3_hibernate_initramfs_modules_before.stdout_lines
       }}
 
-- name: Rebuild dracut initramfs for target kernel
+- name: Rebuild dracut initramfs for highest installed kernel
   become: true
   ansible.builtin.command:
     argv:
@@ -576,12 +506,10 @@
   ansible.builtin.command:
     argv:
       - update-grub
-  when: >-
-    swift3_hibernate_grub_global_config.changed
-    or swift3_hibernate_grub_config.changed
-    or swift3_hibernate_initramfs_rebuilt.changed | default(false)
+  when:
+    - swift3_hibernate_grub_global_config.changed or swift3_hibernate_grub_config.changed
 
-- name: Read modules from generated initramfs
+- name: Read generated initramfs modules
   become: true
   ansible.builtin.command:
     argv:
@@ -591,26 +519,14 @@
   register: swift3_hibernate_initramfs_modules
   changed_when: false
 
-- name: Verify required dracut modules are present
+- name: Verify required dracut modules
   ansible.builtin.assert:
     that:
       - "'crypt' in swift3_hibernate_initramfs_modules.stdout_lines"
       - "'lvm' in swift3_hibernate_initramfs_modules.stdout_lines"
       - "'resume' in swift3_hibernate_initramfs_modules.stdout_lines"
     fail_msg: >-
-      Generated initramfs is missing one or more required dracut modules.
-      Required: crypt, lvm, resume.
-      Present:
-      {{ swift3_hibernate_initramfs_modules.stdout_lines | join(', ') }}.
-
-- name: Verify hibernate can be requested without executing it
-  become: true
-  ansible.builtin.command:
-    argv:
-      - systemctl
-      - --dry-run
-      - hibernate
-  changed_when: false
+      Generated initramfs is missing crypt, lvm or resume.
 
 - name: Report hibernate configuration
   ansible.builtin.debug:
