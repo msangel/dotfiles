@@ -3,6 +3,9 @@
   ansible.builtin.import_tasks: acer-swift3/audio.yml
   when: swift3_audio_enabled | bool
 
+- name: Disable Swift 3 USB port 9
+  ansible.builtin.import_tasks: acer-swift3/disable-usb-port9.yml
+
 - name: Configure Swift 3 hibernate
   ansible.builtin.import_tasks: acer-swift3/hibernate.yml
   when: swift3_hibernate_enabled | bool
