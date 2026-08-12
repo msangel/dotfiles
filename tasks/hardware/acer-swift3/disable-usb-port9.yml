@@ -1,0 +1,17 @@
+---
+- name: Check Swift 3 USB port 9 state
+  ansible.builtin.command:
+    argv:
+      - cat
+      - /sys/bus/usb/devices/1-0:1.0/usb1-port9/disable
+  register: swift3_usb_port9_disable_state
+  changed_when: false
+
+- name: Disable Swift 3 USB port 9
+  become: true
+  ansible.builtin.command:
+    argv:
+      - tee
+      - /sys/bus/usb/devices/1-0:1.0/usb1-port9/disable
+    stdin: "1"
+  when: swift3_usb_port9_disable_state.stdout | trim != '1'
