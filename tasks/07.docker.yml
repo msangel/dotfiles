@@ -115,6 +115,8 @@
         state: directory
         mode: "0755"
 
+    # Docker rootless disables host loopback access by default. Setting this
+    # RootlessKit option to false makes the host reachable as 10.0.2.2.
     - name: Configure rootless Docker host loopback access
       ansible.builtin.copy:
         dest: "{{ target_home }}/.config/systemd/user/docker.service.d/override.conf"
@@ -130,6 +132,11 @@
         state: directory
         mode: "0755"
 
+    # Pin Docker's host-gateway value to the RootlessKit host address.
+    # Compose files can then use:
+    #
+    #   extra_hosts:
+    #     - "host.docker.internal:host-gateway"
     - name: Configure rootless Docker daemon
       ansible.builtin.copy:
         dest: "{{ target_home }}/.config/docker/daemon.json"
